@@ -148,6 +148,7 @@ public class FindRepeatRes
         }
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
+        AssetDatabase.Refresh();
     }
     [MenuItem("Tools/common资源汇总")]
 
