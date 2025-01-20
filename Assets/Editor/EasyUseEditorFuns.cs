@@ -202,6 +202,7 @@ public  class EasyUseEditorFuns
     /// <param name="contents"></param>
     public static void WriteFileToTargetPath(string filePath,string contents)
     {
+        filePath = Path.GetFullPath(filePath);
         var folderName = System.IO.Path.GetDirectoryName(filePath);
         if(!Directory.Exists(folderName))
         {

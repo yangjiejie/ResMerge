@@ -170,6 +170,9 @@ public class FindRepeatRes
         mergeedSpriteBeDepandence?.Clear();
         needDelTextureInfos?.Clear();
 
+        CollectAllCommonRes();
+
+
         var allRes = AssetDatabase.FindAssets("t:prefab t:Material",new string[] {
             "Assets/prefab1" ,
             "Assets/prefab2" ,
