@@ -91,7 +91,7 @@ public class FindRepeatRes
     }
 
     public static List<MainResInfo> allMainResList = new List<MainResInfo>();
-    public static List<SubResInfo> allTextureInfoList = new List<SubResInfo>();
+    public static List<SubResInfo> allSubInfoLists = new List<SubResInfo>();
 
     public static Dictionary<string, List<MainResInfo>> likeSpriteResDepandence = new Dictionary<string, List<MainResInfo>>();
 
@@ -109,7 +109,7 @@ public class FindRepeatRes
     public static void Collect()
     {
         allMainResList?.Clear();
-        allTextureInfoList?.Clear();
+        allSubInfoLists?.Clear();
         spriteBeDepandence?.Clear();
         likeSpriteResDepandence?.Clear();
         mergeedSpriteBeDepandence?.Clear();
@@ -133,10 +133,10 @@ public class FindRepeatRes
 
                 for(int i = 0; i < childsInfo.Count; i++)
                 {
-                    var findRst = allTextureInfoList.Find((xx) => xx.resPath == childsInfo[i].resPath);
+                    var findRst = allSubInfoLists.Find((xx) => xx.resPath == childsInfo[i].resPath);
                     if (findRst == null)
                     {
-                        allTextureInfoList.Add(childsInfo[i]);
+                        allSubInfoLists.Add(childsInfo[i]);
                     }
                 }
                 
@@ -189,7 +189,8 @@ public class FindRepeatRes
         // key是assetPath名 
         foreach (var item in spriteBeDepandence)
         {
-            var findRst = allTextureInfoList.Find((xx) => xx.resPath == item.Key);
+            
+            var findRst = GetTextureInfo(item.Key);
             if (findRst == null) Debug.LogError("运行错误！");
 
             if(mergeedSpriteBeDepandence.Count == 0)
@@ -211,6 +212,10 @@ public class FindRepeatRes
                     {
                         var unNormalSprite =  spriteBeDepandence.FirstOrDefault((yy) => yy.Key == findRst.resPath);
                         needDelTextureInfos.Add(unNormalSprite.Key, unNormalSprite.Value);
+                    }
+                    else
+                    {
+                        needDelTextureInfos.Add(item.Key, item.Value);
                     }
 
                 }
@@ -249,7 +254,7 @@ public class FindRepeatRes
 
     static SubResInfo GetTextureInfo(string assetPath)
     {
-        return allTextureInfoList.Find((xx) => assetPath == xx.resPath);
+        return allSubInfoLists.Find((xx) => assetPath == xx.resPath);
         
     }
 }
