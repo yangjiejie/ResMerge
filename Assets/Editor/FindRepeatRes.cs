@@ -122,7 +122,8 @@ public class FindRepeatRes
             var targetFilePath = Path.Combine(System.Environment.CurrentDirectory, resPath);
             EasyUseEditorFuns.UnitySaveCopyFile(reallyFilePath, targetFilePath);
         }
-        
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
     }
 
     [MenuItem("Tools/测试查找重复资源 #&p")]
@@ -257,16 +258,33 @@ public class FindRepeatRes
             var targetRes =  mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
             var targetUUid = targetRes.Value.uuid;
 
-            
+            // 先存档 本地版本管理 
             for(int i = 0; i < item.Value.Count; i++)
             {
                 for(int j = 0; j < item.Value[i].editorResInfos.Count;j++)
                 {
+                     
                     var suorcePath = Path.Combine(System.Environment.CurrentDirectory, item.Value[i].editorResInfos[j].resPath);
                     var targetPath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, item.Value[i].editorResInfos[j].resPath);
                     EasyUseEditorFuns.UnitySaveCopyFile(suorcePath, targetPath, true);
+
+
+                    var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, item.Value[i].editorResInfos[j].resPath + ".path");
+                    // 用额外的txt文件记录该文件的路径 方便回退
+                    EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, item.Value[i].editorResInfos[j].resPath);
+
+                }
+            }
+            // 然后进行替换 避免无法回滚 
+
+            AssetDatabase.Refresh(); // 刷新unity DB
+
+            for (int i = 0; i < item.Value.Count; i++)
+            {
+                for (int j = 0; j < item.Value[i].editorResInfos.Count; j++)
+                {
                     EditorResReplaceByUuid.ReplaceUUID(item.Value[i].editorResInfos[j].resPath, needDelTextureRes.uuid, targetUUid);
-                    
+
                 }
             }
 
