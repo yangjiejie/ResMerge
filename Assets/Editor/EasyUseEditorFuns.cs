@@ -12,11 +12,22 @@ public  class EasyUseEditorFuns
 {
     public static string baseCustomTmpCache =  System.Environment.CurrentDirectory + "/../CustomTmpCache";
 
+
+
+    public static string GetLinuxPath(string s)
+    {
+        return s.Replace("\\", "/");
+    }
     public static void UnitySaveCopyFile(string source,string target,bool overrite = true)
     {
+        source = GetLinuxPath(source);
+        target = GetLinuxPath(target);
         var sourceFolder = System.IO.Path.GetDirectoryName(source);
         var targetFolder = System.IO.Path.GetDirectoryName(target);
+
         
+        CreateDir(Path.GetFullPath(sourceFolder));
+        CreateDir(Path.GetFullPath(targetFolder)); 
 
         var sourceName = System.IO.Path.GetFileNameWithoutExtension(source);
         var targetName = System.IO.Path.GetFileNameWithoutExtension(target);
@@ -42,9 +53,8 @@ public  class EasyUseEditorFuns
                 //拷贝到相关目录 会包含meta 
                 var source = Path.Combine(System.Environment.CurrentDirectory, resPath);
                 var fileNameWithSuffix = Path.GetFileName(resPath);
-                
                 var target = Path.Combine(baseCustomTmpCache, fileNameWithSuffix);
-                UnitySaveCopyFile(resPath, target, true);
+                UnitySaveCopyFile(source, target, true);
                 
                 var metaFilePath  = Path.Combine(baseCustomTmpCache, fileNameWithSuffix + ".path");
                 // 用额外的txt文件记录该文件的路径 方便回退
@@ -200,6 +210,7 @@ public  class EasyUseEditorFuns
         {
             return 1;
         }
+        path = GetLinuxPath(path);
         string tmp = path.Substring(0, path.LastIndexOf("/"));
         if (1 == CreateDir(tmp))
         {
