@@ -7,9 +7,58 @@ using System.Reflection;
 using UnityEditor.Build;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 public  class EasyUseEditorFuns
 {
+    public static string baseCustomTmpCache =  System.Environment.CurrentDirectory + "/../CustomTmpCache";
 
+    public static void UnitySaveCopyFile(string source,string target,bool overrite = true)
+    {
+        var sourceFolder = System.IO.Path.GetDirectoryName(source);
+        var targetFolder = System.IO.Path.GetDirectoryName(target);
+        
+
+        var sourceName = System.IO.Path.GetFileNameWithoutExtension(source);
+        var targetName = System.IO.Path.GetFileNameWithoutExtension(target);
+        //拷贝源文件  
+        System.IO.File.Copy(source, target, overrite);
+        Regex.Match(source, @"\.([a-zA-Z0-9]+)$");
+        //拷贝meta文件 
+        System.IO.File.Copy(Path.Combine(sourceFolder, sourceName + ".meta"), Path.Combine( targetFolder , targetName + ".meta"), overrite);
+    }
+    /// <summary>
+    /// 参数2 是否存档 
+    /// </summary>
+    /// <param name="resPath"></param>
+    /// <param name="isSaveToLocal"></param>
+    public static void DelEditorResFromDevice(string resPath,bool isSaveToLocal = true)
+    {
+        try
+        {
+            if (!isSaveToLocal)
+                Debug.Log($"{resPath}已删除且不存档");
+            else
+            {
+                //拷贝到相关目录 会包含meta 
+                var source = Path.Combine(System.Environment.CurrentDirectory, resPath);
+                var fileNameWithSuffix = Path.GetFileName(resPath);
+                
+                var target = Path.Combine(baseCustomTmpCache, fileNameWithSuffix);
+                UnitySaveCopyFile(resPath, target, true);
+                
+                var metaFilePath  = Path.Combine(baseCustomTmpCache, fileNameWithSuffix + ".path");
+                // 用额外的txt文件记录该文件的路径 方便回退
+                WriteFileToTargetPath(metaFilePath, resPath);
+            }
+            File.Delete(Path.Combine(System.Environment.CurrentDirectory, resPath));
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError(e.ToString());
+        }
+
+
+    }
     public static string CalculateMD5(string filePath)
     {
         using (var md5 = MD5.Create())
@@ -128,6 +177,20 @@ public  class EasyUseEditorFuns
 
         AssetDatabase.Refresh();
 
+    }
+    /// <summary>
+    /// 任何情况下都需要能写入一个文件
+    /// </summary>
+    /// <param name="filePath"></param>
+    /// <param name="contents"></param>
+    public static void WriteFileToTargetPath(string filePath,string contents)
+    {
+        var folderName = System.IO.Path.GetDirectoryName(filePath);
+        if(!Directory.Exists(folderName))
+        {
+            CreateDir(folderName);
+        }
+        File.WriteAllText(filePath, contents);
     }
 
     public static int CreateDir(string path)

@@ -41,7 +41,7 @@ public class FindRepeatRes
         {
             try
             {
-                File.Delete(Path.Combine(System.Environment.CurrentDirectory, resPath));
+                EasyUseEditorFuns.DelEditorResFromDevice(resPath, true);
             }
             catch (System.Exception e)
             {
@@ -246,6 +246,7 @@ public class FindRepeatRes
                     
                 }
             }
+
             needDelTextureRes.DelFromDevice(); // 从磁盘上删除 
 
             Debug.Log("需要删除" + item.Key);
