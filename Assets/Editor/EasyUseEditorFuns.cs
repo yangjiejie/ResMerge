@@ -24,18 +24,20 @@ public  class EasyUseEditorFuns
         target = GetLinuxPath(target);
         var sourceFolder = System.IO.Path.GetDirectoryName(source);
         var targetFolder = System.IO.Path.GetDirectoryName(target);
+        sourceFolder = Path.GetFullPath(sourceFolder);
+        targetFolder = Path.GetFullPath(targetFolder);
+        CreateDir(sourceFolder);
+        CreateDir(targetFolder); 
 
-        
-        CreateDir(Path.GetFullPath(sourceFolder));
-        CreateDir(Path.GetFullPath(targetFolder)); 
-
-        var sourceName = System.IO.Path.GetFileNameWithoutExtension(source);
-        var targetName = System.IO.Path.GetFileNameWithoutExtension(target);
+        var sourceName = System.IO.Path.GetFileName(source);
+        var targetName = System.IO.Path.GetFileName(target);
         //拷贝源文件  
         System.IO.File.Copy(source, target, overrite);
         Regex.Match(source, @"\.([a-zA-Z0-9]+)$");
         //拷贝meta文件 
-        System.IO.File.Copy(Path.Combine(sourceFolder, sourceName + ".meta"), Path.Combine( targetFolder , targetName + ".meta"), overrite);
+        var metaSourceFile = Path.Combine(sourceFolder, sourceName + ".meta");
+        var metaTargeFile = Path.Combine(targetFolder, targetName + ".meta");
+        System.IO.File.Copy(metaSourceFile, metaTargeFile, overrite);
     }
     /// <summary>
     /// 参数2 是否存档 

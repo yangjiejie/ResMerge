@@ -105,6 +105,26 @@ public class FindRepeatRes
     public static string CommonImage = "gameCommon/image";
 
 
+
+    [MenuItem("Tools/回退本地操作 #&p")]
+    public static void ReverseLocalSvn()
+    {
+        var allFilePath = EasyUseEditorFuns.baseCustomTmpCache;
+        var allFiles = Directory.GetFiles(allFilePath,"*.path");
+
+
+        
+
+        foreach(var file in allFiles)
+        {
+            var reallyFilePath =  file.Replace(".path", "");
+            var resPath = File.ReadAllText(file);
+            var targetFilePath = Path.Combine(System.Environment.CurrentDirectory, resPath);
+            EasyUseEditorFuns.UnitySaveCopyFile(reallyFilePath, targetFilePath);
+        }
+        
+    }
+
     [MenuItem("Tools/测试查找重复资源 #&p")]
     public static void Collect()
     {
