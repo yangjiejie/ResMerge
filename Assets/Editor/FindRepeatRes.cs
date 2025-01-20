@@ -1,16 +1,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using PlasticGui.WebApi.Responses;
-using Unity.Android.Types;
+using System.Text.RegularExpressions;
 using UnityEditor;
-using UnityEditor.ShaderKeywordFilter;
+
 using UnityEngine;
 
 
-public class FindRepeatRes
+public class FindRepeatRes : EditorWindow
 {
 
 
@@ -107,8 +104,151 @@ public class FindRepeatRes
     public static string CommonImage = "Assets/gameCommon/image";
 
 
+    [MenuItem("Tools/资源查重合并",priority = -100)]
+    public static void OpenResWindow()
+    {
+        GetWindow<FindRepeatRes>("资源查重&合并");
+    }
 
-    [MenuItem("Tools/回退本地操作 #&p")]
+    public void OnGUI()
+    {
+        if(GUILayout.Button("1清理无任何引用关联的资源"))
+        {
+
+            ClearUnUsedTextures();
+        }
+
+        if (GUILayout.Button("2清理重复资源"))
+        {
+            CleanRepeatRes();
+        }
+
+        if (GUILayout.Button("3回滚清理的资源"))
+        {
+            ReverseLocalSvn();
+        }
+    }
+    private static void ClearUnUsedTextures()
+    {
+        // 获取所有资源
+        var allAssetPaths = AssetDatabase.FindAssets("t:Sprite", new string[] { "Assets" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>(); 
+        
+        List<string> unusedAssets = new List<string>();
+
+        foreach (string assetPath in allAssetPaths)
+        {
+            // 排除脚本和编辑器文件夹
+            if (assetPath.EndsWith(".cs") || assetPath.StartsWith("Assets/Editor"))
+                continue;
+
+            // 检查资源是否被引用
+            if (!IsAssetUsed(assetPath))
+            {
+                unusedAssets.Add(assetPath);
+            }
+        }
+
+        // 删除未使用的资源
+        if (unusedAssets.Count > 0)
+        {
+            foreach (string path in unusedAssets)
+            {
+                Debug.Log("Deleting unused asset: " + path);
+
+                var ss = Path.Combine(System.Environment.CurrentDirectory, path);
+                var tt = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, path);
+                EasyUseEditorFuns.UnitySaveCopyFile(ss, tt, true);
+
+
+                var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, path + ".path");
+                // 用额外的txt文件记录该文件的路径 方便回退
+                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, path);
+
+                AssetDatabase.DeleteAsset(path);
+            }
+            AssetDatabase.Refresh();
+            Debug.Log("Deleted " + unusedAssets.Count + " unused assets.");
+        }
+        else
+        {
+            Debug.Log("No unused assets found.");
+        }
+
+    }
+
+    private static bool IsAssetUsed(string assetPath)
+    {
+        // 获取所有场景和预制件
+        var allAssetPaths = AssetDatabase.FindAssets("t:prefab t:material", new string[] { "Assets" }).Select((xx)=>AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
+
+
+        foreach (string path in allAssetPaths)
+        {
+            if (path.StartsWith("Assets/Editor"))
+                continue;
+
+            // 加载资源
+           var dependencies = AssetDatabase.GetDependencies(path);
+
+            foreach (var obj in dependencies)
+            {
+                if (obj != null && obj == assetPath)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+    public static void ClearUnUsedTexturesImp(string  assetPath,List<string> allMainRes)
+    {
+        EditorSettings.serializationMode = SerializationMode.ForceText;
+        
+        string path = assetPath;
+        if (!string.IsNullOrEmpty(path))
+        {
+            string guid = AssetDatabase.AssetPathToGUID(path);
+            int startIndex = 0;
+            if (allMainRes.Count > 0)
+            {
+                while(startIndex < allMainRes.Count)
+                {
+                    string file = allMainRes[startIndex];
+
+                    
+
+                    if (Regex.IsMatch(File.ReadAllText(file), guid))
+                    {
+                        var startCount = file.IndexOf("/Assets");
+                        var newFilePath = file.Substring(startCount + 1);
+                    }
+                    else // 无任何引用 需要清理 
+                    {
+                        Debug.Log("无任何引用的资源" + path);
+                    }
+
+                    startIndex++;
+                    if ( startIndex >= allMainRes.Count)
+                    {
+                        EditorUtility.ClearProgressBar();
+                        EditorApplication.update = null;
+                        startIndex = 0;
+                        Debug.Log("<color=#006400>查找结束" + assetPath + "</color>");
+                    }
+
+
+                    else
+                        Debug.Log("<color=#006400>查找结束" + assetPath + "</color>");
+                }
+                
+            }
+            
+        }
+    }
+
+
+    
     public static void ReverseLocalSvn()
     {
         var root=  System.Environment.CurrentDirectory + "/../mySvn";
@@ -179,7 +319,7 @@ public class FindRepeatRes
     }
 
     [MenuItem("Tools/资源查重&重定向 ")]
-    public static void Collect()
+    public static void CleanRepeatRes()
     {
         allMainResList?.Clear();
         allSubInfoLists?.Clear();
