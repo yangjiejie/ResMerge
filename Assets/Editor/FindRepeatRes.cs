@@ -92,6 +92,7 @@ public class FindRepeatRes
 
     public static List<MainResInfo> allMainResList = new List<MainResInfo>();
     public static List<SubResInfo> allSubInfoLists = new List<SubResInfo>();
+    public static List<SubResInfo> allCommonSubInfoList = new();
 
     public static Dictionary<string, List<MainResInfo>> likeSpriteResDepandence = new Dictionary<string, List<MainResInfo>>();
 
@@ -109,7 +110,16 @@ public class FindRepeatRes
     [MenuItem("Tools/回退本地操作 #&p")]
     public static void ReverseLocalSvn()
     {
-        var allFilePath = EasyUseEditorFuns.baseCustomTmpCache;
+        var root=  System.Environment.CurrentDirectory + "/../mySvn";
+        var listFolder = Directory.GetDirectories(root).ToList();
+        listFolder.Sort((a, b)=>
+        {
+            return b.CompareTo(a);
+        });
+
+
+        var allFilePath = listFolder[0];
+
         var allFiles = Directory.GetFiles(allFilePath,"*.path",SearchOption.AllDirectories);
 
 
@@ -125,12 +135,20 @@ public class FindRepeatRes
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
     }
+    [MenuItem("Tools/common资源汇总")]
 
+    public static void GetAllCommonRes()
+    {
+        var guids = AssetDatabase.FindAssets("t:Sprite", new string[] { "Assets/gameCommon/image" });
+        var list = guids.Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
+
+    }
     [MenuItem("Tools/资源查重&重定向 ")]
     public static void Collect()
     {
         allMainResList?.Clear();
         allSubInfoLists?.Clear();
+        allCommonSubInfoList?.Clear();
         spriteBeDepandence?.Clear();
         likeSpriteResDepandence?.Clear();
         mergeedSpriteBeDepandence?.Clear();
@@ -175,6 +193,8 @@ public class FindRepeatRes
                 likeSpriteResDepandence[subRes.resPath].Add(mainRes);
             }            
         }
+
+        
 
         //由于 likeSpriteResDepandecen 的list数组中 可能某几个项都是一个功能目录 也就是
         //一个ab包 所以这里还需要再封装依次 
@@ -236,6 +256,7 @@ public class FindRepeatRes
                     }
                     else
                     {
+                        //需要先判断common中是否存在该资源 item.key
                         needDelTextureInfos.Add(item.Key, item.Value);
                     }
                 }
