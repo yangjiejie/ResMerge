@@ -102,7 +102,7 @@ public class FindRepeatRes
     public static Dictionary<string, List<ComboMainResInfo>> needDelTextureInfos = new Dictionary<string, List<ComboMainResInfo>>();
 
 
-    
+    public static string CommonImage = "gameCommon/image";
 
 
     [MenuItem("Tools/测试查找重复资源 #&p")]
@@ -206,11 +206,13 @@ public class FindRepeatRes
                 }
                 else
                 {
-                    if(rst.Value.resPath.Contains("gameCommon/image"))
+                    //如果findRst 包括了common，common是不能被剔除的 .
+                    if (findRst.resPath.Contains(CommonImage))
                     {
-
+                        var unNormalSprite =  spriteBeDepandence.FirstOrDefault((yy) => yy.Key == findRst.resPath);
+                        needDelTextureInfos.Add(unNormalSprite.Key, unNormalSprite.Value);
                     }
-                    needDelTextureInfos.Add(item.Key, item.Value);
+
                 }
             }
             
