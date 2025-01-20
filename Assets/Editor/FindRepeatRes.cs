@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-
+using PlasticGui.WebApi.Responses;
 using Unity.Android.Types;
 using UnityEditor;
 using UnityEditor.ShaderKeywordFilter;
@@ -98,12 +98,12 @@ public class FindRepeatRes
 
     public static Dictionary<string, List<ComboMainResInfo>> spriteBeDepandence = new Dictionary<string, List<ComboMainResInfo>>();
 
-    public static Dictionary<SubResInfo, SubResInfo> mergeedSpriteBeDepandence = new();
+    public static Dictionary<SubResInfo, bool> mergeedSpriteBeDepandence = new();
 
     public static Dictionary<string, List<ComboMainResInfo>> needDelTextureInfos = new Dictionary<string, List<ComboMainResInfo>>();
 
 
-    public static string CommonImage = "gameCommon/image";
+    public static string CommonImage = "Assets/gameCommon/image";
 
 
 
@@ -137,12 +137,28 @@ public class FindRepeatRes
     }
     [MenuItem("Tools/common资源汇总")]
 
-    public static void GetAllCommonRes()
+    public static void CollectAllCommonRes()
     {
-        var guids = AssetDatabase.FindAssets("t:Sprite", new string[] { "Assets/gameCommon/image" });
+        var guids = AssetDatabase.FindAssets("t:Sprite", new string[] { CommonImage });
         var list = guids.Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
-
+        for(int i = 0; i < list.Count; i++)
+        {
+            var info = new SubResInfo();
+            info.Init(list[i]);
+            allCommonSubInfoList.Add(info);
+        }
     }
+    public static SubResInfo GetCommonRes(string md5Code)
+    {
+        if (allCommonSubInfoList.Count == 0) return null;
+        var rst = allCommonSubInfoList.Find((xx) => xx.md5Code == md5Code);
+        if(rst != null)
+        {
+            return rst;
+        }
+        return null;
+    }
+
     [MenuItem("Tools/资源查重&重定向 ")]
     public static void Collect()
     {
@@ -234,30 +250,30 @@ public class FindRepeatRes
 
             if(mergeedSpriteBeDepandence.Count == 0)
             {
-                mergeedSpriteBeDepandence.Add(findRst, findRst);
+                mergeedSpriteBeDepandence.Add(findRst, true);
             }
             else
             {
-                
-                var conflictRst = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == findRst.md5Code);
-                if(conflictRst.Key == null || conflictRst.Value == null)
+                //已合并的资源中是否有md5相同的资源 有则冲突 
+                var mergedObj = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == findRst.md5Code);
+                if(mergedObj.Key == null )
                 {
-                    mergeedSpriteBeDepandence.Add(findRst, findRst);
+                    mergeedSpriteBeDepandence.Add(findRst, true);
                 }
-                else
+                else 
                 {
                     //如果findRst 包括了common，common是不能被剔除的 .
                     if (findRst.resPath.Contains(CommonImage))
                     {
-                        mergeedSpriteBeDepandence.Remove(conflictRst.Key);
-                        var unNormalSprite =  spriteBeDepandence.FirstOrDefault((yy) => yy.Key == conflictRst.Value.resPath);
+                        mergeedSpriteBeDepandence.Remove(mergedObj.Key);
+                        var unNormalSprite =  spriteBeDepandence.FirstOrDefault((yy) => yy.Key == mergedObj.Key.resPath);
                         needDelTextureInfos.Add(unNormalSprite.Key, unNormalSprite.Value);
-                        mergeedSpriteBeDepandence.Add(findRst, findRst);
+                        mergeedSpriteBeDepandence.Add(findRst, true);
                     }
                     else
                     {
-                        //需要先判断common中是否存在该资源 item.key
                         needDelTextureInfos.Add(item.Key, item.Value);
+
                     }
                 }
             }
@@ -272,11 +288,6 @@ public class FindRepeatRes
         //先copy到local版本   
         foreach (var item in needDelTextureInfos)
         {
-            var needDelTextureRes = GetTextureInfo(item.Key);
-            //需要替换的uuid
-            var targetRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
-            var targetUUid = targetRes.Value.uuid;
-
             // 先存档 本地版本管理 
             for (int i = 0; i < item.Value.Count; i++)
             {
@@ -293,13 +304,44 @@ public class FindRepeatRes
                 }
             }
         }
+       
+
         AssetDatabase.Refresh(); // 刷新unity DB
         foreach (var item in needDelTextureInfos)
         {
             var needDelTextureRes = GetTextureInfo(item.Key);
-            //需要替换的uuid
+
             var targetRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
-            var targetUUid = targetRes.Value.uuid;
+
+            if (needDelTextureRes.resPath == targetRes.Key.resPath)
+            {
+                Debug.LogError("逻辑错误");
+                continue;
+            }
+
+            var targetUUid = targetRes.Key.uuid;
+
+            var commonRes = GetCommonRes(needDelTextureRes.md5Code);
+
+            if(commonRes == null)
+            {
+                //将已经被设为合并的资源放到common中 ，这个资源被依赖的主资源不用更新 
+                var source = Path.Combine(System.Environment.CurrentDirectory, targetRes.Key.resPath);
+                var fileName = Path.GetFileName(targetRes.Key.resPath);
+                var target = Path.Combine(System.Environment.CurrentDirectory, CommonImage, fileName);
+                EasyUseEditorFuns.UnitySaveCopyFile(source, target, true);
+
+                //这里我们只有.path文件过去 没有实际的文件拷贝过去,目的就是为了做回滚
+                var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, targetRes.Key.resPath + ".path");
+                // 用额外的txt文件记录该文件的路径 方便回退
+                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, targetRes.Key.resPath);
+                // end 
+                targetRes.Key.DelFromDevice();
+                
+            }
+            
+            
+            
 
             for (int i = 0; i < item.Value.Count; i++)
             {

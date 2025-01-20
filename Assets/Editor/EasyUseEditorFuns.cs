@@ -18,6 +18,12 @@ public  class EasyUseEditorFuns
     {
         return s.Replace("\\", "/");
     }
+    /// <summary>
+    /// 拷贝unity的文件从source到taget 并且也拷贝meta文件
+    /// </summary>
+    /// <param name="source 需要全路径"></param>
+    /// <param name="target 需要全路径"></param>
+    /// <param name="overrite"></param>
     public static void UnitySaveCopyFile(string source,string target,bool overrite = true)
     {
         source = GetLinuxPath(source);
