@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 6409752657746535295}
   - component: {fileID: 3537536349414128165}
   m_Layer: 5
-  m_Name: resA
+  m_Name: resb
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -166,7 +166,7 @@ GameObject:
   - component: {fileID: 9049386536063375681}
   - component: {fileID: 5415059890721812724}
   m_Layer: 5
-  m_Name: resA1
+  m_Name: resb2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
