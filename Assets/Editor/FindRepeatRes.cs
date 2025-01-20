@@ -29,13 +29,14 @@ public class FindRepeatRes
         public string resPath;
         public string md5Code;
         public string uuid;
-        public void Init(string pathName)
+        public SubResInfo Init(string pathName)
         {
             this.resName = Path.GetFileNameWithoutExtension(pathName);
             this.resNameLittle = resName.ToLower();
             this.resPath = pathName;
             this.uuid = AssetDatabase.AssetPathToGUID(pathName);
             this.md5Code = EasyUseEditorFuns.CalculateMD5(pathName);
+            return this;
         }
         public void DelFromDevice()
         {
@@ -147,6 +148,10 @@ public class FindRepeatRes
             info.Init(list[i]);
             allCommonSubInfoList.Add(info);
         }
+    }
+    private static void UpdateCommonRes(string resPath)
+    {
+        allCommonSubInfoList.Add(new SubResInfo().Init(resPath));
     }
     public static SubResInfo GetCommonRes(string md5Code)
     {
@@ -307,7 +312,6 @@ public class FindRepeatRes
                 }
             }
         }
-       
 
         AssetDatabase.Refresh(); // 刷新unity DB
         foreach (var item in needDelTextureInfos)
@@ -334,6 +338,7 @@ public class FindRepeatRes
                 var target = Path.Combine(System.Environment.CurrentDirectory, CommonImage, fileName);
                 EasyUseEditorFuns.UnitySaveCopyFile(source, target, true);
 
+                UpdateCommonRes(target);
                 //这里我们只有.path文件过去 没有实际的文件拷贝过去,目的就是为了做回滚
                 var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, targetRes.Key.resPath + ".path");
                 // 用额外的txt文件记录该文件的路径 方便回退
@@ -341,6 +346,18 @@ public class FindRepeatRes
                 // end 
                 targetRes.Key.DelFromDevice();
                 
+            }
+            else
+            {
+                var commonBeDependance = spriteBeDepandence.FirstOrDefault((xx)=>xx.Key == commonRes.resPath);
+                for (int i = 0; i < commonBeDependance.Value.Count; i++)
+                {
+                    for (int j = 0; j < commonBeDependance.Value[i].editorResInfos.Count; j++)
+                    {
+                        EditorResReplaceByUuid.ReplaceUUID(commonBeDependance.Value[i].editorResInfos[j].resPath, commonRes.uuid, targetUUid);
+
+                    }
+                }
             }
             
             
