@@ -350,7 +350,7 @@ public class FindRepeatRes
             else
             {
                 var commonBeDependance = spriteBeDepandence.FirstOrDefault((xx)=>xx.Key == commonRes.resPath);
-                for (int i = 0; i < commonBeDependance.Value.Count; i++)
+                for (int i = 0; commonBeDependance.Key != null && i < commonBeDependance.Value.Count; i++)
                 {
                     for (int j = 0; j < commonBeDependance.Value[i].editorResInfos.Count; j++)
                     {
