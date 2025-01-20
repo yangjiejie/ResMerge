@@ -14,26 +14,7 @@ public class FindRepeatRes
 {
 
 
-    static string CalculateMD5(string filePath)
-    {
-        using (var md5 = MD5.Create())
-        {
-            using (var stream = File.OpenRead(filePath))
-            {
-                // 计算文件的 MD5 哈希值
-                byte[] hashBytes = md5.ComputeHash(stream);
-
-                // 将字节数组转换为十六进制字符串
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < hashBytes.Length; i++)
-                {
-                    sb.Append(hashBytes[i].ToString("x2")); // "x2" 表示两位小写十六进制
-                }
-
-                return sb.ToString();
-            }
-        }
-    }
+    
     public class MergedTextureInfo
     {
         public string md5Code;
@@ -54,7 +35,7 @@ public class FindRepeatRes
             this.resNameLittle = resName.ToLower();
             this.resPath = pathName;
             this.uuid = AssetDatabase.AssetPathToGUID(pathName);
-            this.md5Code = CalculateMD5(pathName);
+            this.md5Code = EasyUseEditorFuns.CalculateMD5(pathName);
         }
         public void DelFromDevice()
         {
@@ -94,7 +75,7 @@ public class FindRepeatRes
             this.resNameLittle = resName.ToLower();
             this.resPath = pathName;
             this.uuid = AssetDatabase.AssetPathToGUID(pathName);
-            this.md5Code = CalculateMD5(pathName);
+            this.md5Code = EasyUseEditorFuns.CalculateMD5(pathName);
         }
         public List<SubResInfo> AddDependency(string[] pathNameArray)
         {
@@ -204,7 +185,8 @@ public class FindRepeatRes
             }
         }
 
-        // spriteBeDepandence  是子资源 map 一堆主资源的 映射  
+        // spriteBeDepandence  是子资源 map 一堆主资源的 映射
+        // key是assetPath名 
         foreach (var item in spriteBeDepandence)
         {
             var findRst = allTextureInfoList.Find((xx) => xx.resPath == item.Key);
@@ -224,6 +206,10 @@ public class FindRepeatRes
                 }
                 else
                 {
+                    if(rst.Value.resPath.Contains("gameCommon/image"))
+                    {
+
+                    }
                     needDelTextureInfos.Add(item.Key, item.Value);
                 }
             }

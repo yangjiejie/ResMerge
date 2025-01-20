@@ -1,4 +1,4 @@
-﻿using UnityEditor;
+using UnityEditor;
 using UnityEngine;
 using System.IO;
 
@@ -32,6 +32,8 @@ public class EditorResReplaceByUuid
                 {
                     // 替换 UUID A 为 UUID B
                     fileContent = fileContent.Replace(uuidA, uuidB);
+
+                    //写回文件之前先备份
 
                     // 写回文件
                     File.WriteAllText(resPath, fileContent);
