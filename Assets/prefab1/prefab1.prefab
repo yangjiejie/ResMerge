@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2172658596842239686}
   - component: {fileID: 4300024248328068312}
   m_Layer: 5
-  m_Name: resa_s2_a1
+  m_Name: sprite2_A1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -88,7 +88,7 @@ GameObject:
   - component: {fileID: 8141317391452816692}
   - component: {fileID: 3696754881757190592}
   m_Layer: 5
-  m_Name: resA2
+  m_Name: sprite2A
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -245,7 +245,7 @@ GameObject:
   - component: {fileID: 7644443832450424247}
   - component: {fileID: 5122136251509404672}
   m_Layer: 5
-  m_Name: resa_s1_a1
+  m_Name: sprite_A1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -321,7 +321,7 @@ GameObject:
   - component: {fileID: 5967672574407472811}
   - component: {fileID: 9183125624196799476}
   m_Layer: 5
-  m_Name: resA
+  m_Name: spriteA
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -397,7 +397,7 @@ GameObject:
   - component: {fileID: 4644554058846725343}
   - component: {fileID: 330192404837270948}
   m_Layer: 5
-  m_Name: resA3
+  m_Name: gameCommonA
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
