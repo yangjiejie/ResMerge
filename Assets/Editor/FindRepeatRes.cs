@@ -210,7 +210,7 @@ public class FindRepeatRes
                     //如果findRst 包括了common，common是不能被剔除的 .
                     if (findRst.resPath.Contains(CommonImage))
                     {
-                        var unNormalSprite =  spriteBeDepandence.FirstOrDefault((yy) => yy.Key == findRst.resPath);
+                        var unNormalSprite =  spriteBeDepandence.FirstOrDefault((yy) => yy.Key == rst.Value.resPath);
                         needDelTextureInfos.Add(unNormalSprite.Key, unNormalSprite.Value);
                     }
                     else
