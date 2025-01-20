@@ -131,7 +131,20 @@ public class FindRepeatRes
             var reallyFilePath =  file.Replace(".path", "");
             var resPath = File.ReadAllText(file);
             var targetFilePath = Path.Combine(System.Environment.CurrentDirectory, resPath);
-            EasyUseEditorFuns.UnitySaveCopyFile(reallyFilePath, targetFilePath);
+            if(File.Exists( reallyFilePath ))
+            {
+                EasyUseEditorFuns.UnitySaveCopyFile(reallyFilePath, targetFilePath);
+            }
+            else
+            {
+                if(File.Exists(targetFilePath))
+                {
+                    File.Delete(targetFilePath);
+                    File.Delete(targetFilePath+".meta");
+                }
+                
+                
+            }
         }
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
