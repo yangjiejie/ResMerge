@@ -110,7 +110,7 @@ public class FindRepeatRes
     public static void ReverseLocalSvn()
     {
         var allFilePath = EasyUseEditorFuns.baseCustomTmpCache;
-        var allFiles = Directory.GetFiles(allFilePath,"*.path");
+        var allFiles = Directory.GetFiles(allFilePath,"*.path",SearchOption.AllDirectories);
 
 
         
@@ -262,6 +262,9 @@ public class FindRepeatRes
             {
                 for(int j = 0; j < item.Value[i].editorResInfos.Count;j++)
                 {
+                    var suorcePath = Path.Combine(System.Environment.CurrentDirectory, item.Value[i].editorResInfos[j].resPath);
+                    var targetPath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, item.Value[i].editorResInfos[j].resPath);
+                    EasyUseEditorFuns.UnitySaveCopyFile(suorcePath, targetPath, true);
                     EditorResReplaceByUuid.ReplaceUUID(item.Value[i].editorResInfos[j].resPath, needDelTextureRes.uuid, targetUUid);
                     
                 }

@@ -54,11 +54,10 @@ public  class EasyUseEditorFuns
             {
                 //拷贝到相关目录 会包含meta 
                 var source = Path.Combine(System.Environment.CurrentDirectory, resPath);
-                var fileNameWithSuffix = Path.GetFileName(resPath);
-                var target = Path.Combine(baseCustomTmpCache, fileNameWithSuffix);
+                var target = Path.Combine(baseCustomTmpCache, resPath);
                 UnitySaveCopyFile(source, target, true);
                 
-                var metaFilePath  = Path.Combine(baseCustomTmpCache, fileNameWithSuffix + ".path");
+                var metaFilePath  = Path.Combine(baseCustomTmpCache, resPath + ".path");
                 // 用额外的txt文件记录该文件的路径 方便回退
                 WriteFileToTargetPath(metaFilePath, resPath);
             }
