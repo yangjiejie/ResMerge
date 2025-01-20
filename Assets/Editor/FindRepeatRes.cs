@@ -200,8 +200,8 @@ public class FindRepeatRes
             else
             {
                 
-                var rst = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == findRst.md5Code);
-                if(rst.Key == null || rst.Value == null)
+                var conflictRst = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == findRst.md5Code);
+                if(conflictRst.Key == null || conflictRst.Value == null)
                 {
                     mergeedSpriteBeDepandence.Add(findRst, findRst);
                 }
@@ -210,8 +210,10 @@ public class FindRepeatRes
                     //如果findRst 包括了common，common是不能被剔除的 .
                     if (findRst.resPath.Contains(CommonImage))
                     {
-                        var unNormalSprite =  spriteBeDepandence.FirstOrDefault((yy) => yy.Key == rst.Value.resPath);
+                        mergeedSpriteBeDepandence.Remove(conflictRst.Key);
+                        var unNormalSprite =  spriteBeDepandence.FirstOrDefault((yy) => yy.Key == conflictRst.Value.resPath);
                         needDelTextureInfos.Add(unNormalSprite.Key, unNormalSprite.Value);
+                        mergeedSpriteBeDepandence.Add(findRst, findRst);
                     }
                     else
                     {
