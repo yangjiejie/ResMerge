@@ -126,7 +126,7 @@ public class FindRepeatRes
         AssetDatabase.Refresh();
     }
 
-    [MenuItem("Tools/测试查找重复资源 #&p")]
+    [MenuItem("Tools/资源查重&重定向 ")]
     public static void Collect()
     {
         allMainResList?.Clear();
@@ -181,8 +181,6 @@ public class FindRepeatRes
 
         foreach (var subRes in likeSpriteResDepandence)
         {
-
-            
             if (!spriteBeDepandence.ContainsKey(subRes.Key))
             {
                 spriteBeDepandence.Add(subRes.Key, new List<ComboMainResInfo>());
@@ -240,30 +238,29 @@ public class FindRepeatRes
                     {
                         needDelTextureInfos.Add(item.Key, item.Value);
                     }
-
                 }
             }
-            
-           
-
         }
-        var basePath = System.Environment.CurrentDirectory + "/Assets/GamePlay/Art/Common/_Sprite/";
-      //  basePath = CommonUtil.GetLinuxPath(basePath);
-
-
+        DoReplace();
+    }
+    /// <summary>
+    /// 执行资源的清理工作 
+    /// </summary>
+    static void DoReplace()
+    {
+        //先copy到local版本   
         foreach (var item in needDelTextureInfos)
         {
-            var needDelTextureRes =  GetTextureInfo(item.Key);
+            var needDelTextureRes = GetTextureInfo(item.Key);
             //需要替换的uuid
-            var targetRes =  mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
+            var targetRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
             var targetUUid = targetRes.Value.uuid;
 
             // 先存档 本地版本管理 
-            for(int i = 0; i < item.Value.Count; i++)
+            for (int i = 0; i < item.Value.Count; i++)
             {
-                for(int j = 0; j < item.Value[i].editorResInfos.Count;j++)
+                for (int j = 0; j < item.Value[i].editorResInfos.Count; j++)
                 {
-                     
                     var suorcePath = Path.Combine(System.Environment.CurrentDirectory, item.Value[i].editorResInfos[j].resPath);
                     var targetPath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, item.Value[i].editorResInfos[j].resPath);
                     EasyUseEditorFuns.UnitySaveCopyFile(suorcePath, targetPath, true);
@@ -272,12 +269,16 @@ public class FindRepeatRes
                     var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, item.Value[i].editorResInfos[j].resPath + ".path");
                     // 用额外的txt文件记录该文件的路径 方便回退
                     EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, item.Value[i].editorResInfos[j].resPath);
-
                 }
             }
-            // 然后进行替换 避免无法回滚 
-
-            AssetDatabase.Refresh(); // 刷新unity DB
+        }
+        AssetDatabase.Refresh(); // 刷新unity DB
+        foreach (var item in needDelTextureInfos)
+        {
+            var needDelTextureRes = GetTextureInfo(item.Key);
+            //需要替换的uuid
+            var targetRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
+            var targetUUid = targetRes.Value.uuid;
 
             for (int i = 0; i < item.Value.Count; i++)
             {
@@ -299,6 +300,5 @@ public class FindRepeatRes
     static SubResInfo GetTextureInfo(string assetPath)
     {
         return allSubInfoLists.Find((xx) => assetPath == xx.resPath);
-        
     }
 }
