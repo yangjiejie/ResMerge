@@ -23,8 +23,11 @@ public  class EasyUseEditorFuns
         }
         set
         {
-            _baseVersion = value;
-            EditorPrefs.SetString(nameof(baseVersion), value);
+            if(_baseVersion != value)
+            {
+                _baseVersion = value;
+                EditorPrefs.SetString(nameof(baseVersion), value);
+            }
         }
     }
 
