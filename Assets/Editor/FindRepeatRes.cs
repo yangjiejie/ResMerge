@@ -103,11 +103,26 @@ public class FindRepeatRes : EditorWindow
 
     public static string CommonImage = "Assets/gameCommon/image";
 
+    
 
     [MenuItem("Tools/资源查重合并",priority = -100)]
     public static void OpenResWindow()
     {
-        GetWindow<FindRepeatRes>("资源查重&合并");
+
+        Resolution rs = Screen.currentResolution; //获取当前的分辨率 
+        int nWidth = 400;
+        int nHeight = 500;
+        int x = (rs.width - nWidth) / 2;
+        int y = (rs.height - nHeight) / 2;
+        Rect rect = new Rect(x, y, nWidth, nHeight);
+        FindRepeatRes myWindow = (FindRepeatRes)EditorWindow.GetWindowWithRect(typeof(FindRepeatRes), rect, true,
+
+ "资源查重&合并");
+        myWindow.position = rect;
+        myWindow.Show();//展示 
+
+
+       
     }
 
     public void OnGUI()
@@ -116,6 +131,9 @@ public class FindRepeatRes : EditorWindow
        // GUILayout.Label("版本号：", EditorStyles.boldLabel);
         EasyUseEditorFuns.baseVersion = EditorGUILayout.TextField("版本号：", EasyUseEditorFuns.baseVersion);
         GUILayout.EndHorizontal();
+
+        CommonImage = EditorGUILayout.TextField("设置common文件夹：", CommonImage);
+
         if (GUILayout.Button("1清理无任何引用关联的资源"))
         {
 
@@ -281,7 +299,7 @@ public class FindRepeatRes : EditorWindow
         AssetDatabase.Refresh();
         AssetDatabase.Refresh();
     }
-    [MenuItem("Tools/common资源汇总")]
+    
 
     public static void CollectAllCommonRes()
     {
