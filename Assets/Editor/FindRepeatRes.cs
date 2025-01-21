@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,8 +10,6 @@ using UnityEngine;
 
 public class FindRepeatRes : EditorWindow
 {
-
-
     
     public class MergedTextureInfo
     {
@@ -124,7 +123,13 @@ public class FindRepeatRes : EditorWindow
 
        
     }
-
+    public Action closeAction = null;
+    public void OnDestroy()
+    {
+        closeAction?.Invoke();
+        closeAction = null;
+    }
+   
     public void OnGUI()
     {
         GUILayout.BeginHorizontal();
@@ -148,6 +153,14 @@ public class FindRepeatRes : EditorWindow
         if (GUILayout.Button("3回滚清理的资源"))
         {
             ReverseLocalSvn();
+        }
+        if (GUILayout.Button("4打开日志"))
+        {
+            if (EditorLogWindow.GetInstance() == null)
+            {
+                this.closeAction += EditorLogWindow.CloseWindow;
+                EditorLogWindow.OpenWindow(this);
+            }
         }
     }
     private static void ClearUnUsedTextures()
