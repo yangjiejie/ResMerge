@@ -255,21 +255,8 @@ public class FindRepeatRes : EditorWindow
     
     public static void ReverseLocalSvn()
     {
-        var root=  System.Environment.CurrentDirectory + "/../mySvn";
-        var listFolder = Directory.GetDirectories(root).ToList();
-        listFolder.Sort((a, b)=>
-        {
-            return b.CompareTo(a);
-        });
-
-
-        var allFilePath = listFolder[0];
-
-        var allFiles = Directory.GetFiles(allFilePath,"*.path",SearchOption.AllDirectories);
-
-
-        
-
+        var root=  System.Environment.CurrentDirectory + "/../mySvn/" + EasyUseEditorFuns.baseVersion;
+        var allFiles = Directory.GetFiles(root, "*.path",SearchOption.AllDirectories);
         foreach(var file in allFiles)
         {
             var reallyFilePath =  file.Replace(".path", "");
