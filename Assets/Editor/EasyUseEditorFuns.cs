@@ -237,6 +237,7 @@ public  class EasyUseEditorFuns
             CreateDir(folderName);
         }
         File.WriteAllText(filePath, contents);
+        EditorLogWindow.instance?.WriteLog(filePath.Replace(".path", ""));
     }
 
     public static int CreateDir(string path)
