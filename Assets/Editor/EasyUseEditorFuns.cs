@@ -31,7 +31,14 @@ public  class EasyUseEditorFuns
         }
     }
 
-    public static string baseCustomTmpCache = System.Environment.CurrentDirectory + "/../mySvn/" + baseVersion;
+  
+    public static string baseCustomTmpCache
+    {
+        get
+        {
+            return System.Environment.CurrentDirectory + "/../mySvn/" + baseVersion;
+        }
+    }
 
 
 
