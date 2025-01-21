@@ -10,10 +10,25 @@ using System.Text;
 using System.Text.RegularExpressions;
 public  class EasyUseEditorFuns
 {
-  //  public static string baseCustomTmpCache =  System.Environment.CurrentDirectory + "/../mySvn/" //+ //DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
+    //  public static string baseCustomTmpCache =  System.Environment.CurrentDirectory + "/../mySvn/" //+ //DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
 
 
-    public static string baseCustomTmpCache = System.Environment.CurrentDirectory + "/../mySvn";
+    public static string _baseVersion;
+    public static string baseVersion 
+    {
+        get
+        {
+            _baseVersion = EditorPrefs.GetString(nameof(baseVersion), "1");
+            return _baseVersion;
+        }
+        set
+        {
+            _baseVersion = value;
+            EditorPrefs.SetString(nameof(baseVersion), value);
+        }
+    }
+
+    public static string baseCustomTmpCache = System.Environment.CurrentDirectory + "/../mySvn/" + baseVersion;
 
 
 

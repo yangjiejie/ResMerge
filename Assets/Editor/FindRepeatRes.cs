@@ -112,7 +112,11 @@ public class FindRepeatRes : EditorWindow
 
     public void OnGUI()
     {
-        if(GUILayout.Button("1清理无任何引用关联的资源"))
+        GUILayout.BeginHorizontal();
+       // GUILayout.Label("版本号：", EditorStyles.boldLabel);
+        EasyUseEditorFuns.baseVersion = EditorGUILayout.TextField("版本号：", EasyUseEditorFuns.baseVersion);
+        GUILayout.EndHorizontal();
+        if (GUILayout.Button("1清理无任何引用关联的资源"))
         {
 
             ClearUnUsedTextures();
@@ -318,7 +322,7 @@ public class FindRepeatRes : EditorWindow
         return null;
     }
 
-    [MenuItem("Tools/资源查重&重定向 ")]
+    
     public static void CleanRepeatRes()
     {
         allMainResList?.Clear();
@@ -410,7 +414,8 @@ public class FindRepeatRes : EditorWindow
             var findRst = GetTextureInfo(item.Key);
             if (findRst == null) Debug.LogError("运行错误！");
 
-            if(mergeedSpriteBeDepandence.Count == 0)
+            var listCombo = item.Value;
+            if (mergeedSpriteBeDepandence.Count == 0)
             {
                 mergeedSpriteBeDepandence.Add(findRst, true);
             }
