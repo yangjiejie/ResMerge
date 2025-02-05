@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using AdjustSdk;
+using Cysharp.Threading.Tasks.Triggers;
 using UnityEditor;
 
 using UnityEngine;
@@ -10,7 +12,8 @@ using UnityEngine;
 
 public class FindRepeatRes : EditorWindow
 {
-
+    private string inputWindowName;
+    private int inputWindowName_hashCode;
     public class MergedTextureInfo
     {
         public string md5Code;
@@ -104,38 +107,36 @@ public class FindRepeatRes : EditorWindow
 
 
 
-    [MenuItem("Tools/资源查重合并", priority = -100)]
-    public static void OpenResWindow()
-    {
-
-        Resolution rs = Screen.currentResolution; //获取当前的分辨率 
-        int nWidth = 400;
-        int nHeight = 500;
-        int x = (rs.width - nWidth) / 2;
-        int y = (rs.height - nHeight) / 2;
-        Rect rect = new Rect(x, y, nWidth, nHeight);
-        FindRepeatRes myWindow = (FindRepeatRes)EditorWindow.GetWindowWithRect(typeof(FindRepeatRes), rect, true,
-
- "资源查重&合并");
-        myWindow.position = rect;
-        myWindow.Show();//展示 
-
-
-
-    }
+    
     public Action closeAction = null;
+
+
+  
     public void OnDestroy()
     {
+       
         closeAction?.Invoke();
         closeAction = null;
     }
     public UnityEngine.Object commonFoloderObj;
-    public void OnGUI()
+
+    public static UnityEngine.Object checkFolder;
+    public static List<UnityEngine.Object> checkFolders =  new List<UnityEngine.Object>();
+    public static List<UnityEngine.Object> checkChineseFolders =  new List<UnityEngine.Object>();
+    public static List<string> selectFolderPaths = new();
+    
+    int selectPanel = 0;
+
+    string[] namesPanel = new string[]
     {
-        GUILayout.BeginHorizontal();
-        // GUILayout.Label("版本号：", EditorStyles.boldLabel);
-        EasyUseEditorFuns.baseVersion = EditorGUILayout.TextField("版本号：", EasyUseEditorFuns.baseVersion);
-        GUILayout.EndHorizontal();
+        "资源合并",
+        "find脚本引用丢失",
+        "小工具",
+    };
+
+    void DrawResMergeUI()
+    {
+    
         GUILayout.BeginHorizontal();
 
 
@@ -170,57 +171,363 @@ public class FindRepeatRes : EditorWindow
 
         GUILayout.EndHorizontal();
 
-        if (GUILayout.Button("1清理无任何引用关联的资源"))
-        {
+        GUILayout.BeginVertical();
+        GetSelectArtFolders();
+        var tmpGuids = AssetDatabase.FindAssets("t:prefab t:Material", selectFolderPaths.ToArray());
+        var tmpSubGuids = AssetDatabase.FindAssets("t:Sprite", selectFolderPaths.ToArray());
+        GUILayout.Label("检查的目录：主资源" + tmpGuids.Length + "子资源" + tmpSubGuids.Length, GUILayout.Width(340)); // 描述文本
 
-            ClearUnUsedTextures();
+        GUILayout.BeginVertical();
+        for (int i = 0; i < checkFolders.Count; i++)
+        {
+            GUILayout.BeginHorizontal();
+            checkFolders[i] = EditorGUILayout.ObjectField(checkFolders[i],
+                typeof(DefaultAsset), false, GUILayout.Width(200));
+            GUILayout.TextField(selectFolderPaths[i]);
+            GUILayout.EndHorizontal();
         }
+        GUILayout.EndVertical();
+        GUILayout.EndHorizontal();
 
-        if (GUILayout.Button("2清理重复资源"))
+
+        GUILayout.BeginVertical();
+        if (GUILayout.Button("1清理无任何引用关联的资源", GUILayout.Height(50)))
         {
+            
+            allAssetPaths.Clear();
+            if (checkFolders == null || checkFolders.Count == 0) return;
+            List<string> paths = new();
+            foreach (var item in checkFolders)
+            {
+                var path = AssetDatabase.GetAssetPath(item);
+                if (Regex.IsMatch(path, @"/image/") || Regex.IsMatch(path, @"/icon/"))
+                {
+                    //Debug.LogError("目录不正确不能含有icon和image");
+                    //EditorGUILayout.HelpBox("目录不正确不能含有icon和image", MessageType.Error);
+                    continue;
+                }
+                if (File.Exists(path))
+                {
+                    path = System.IO.Path.GetDirectoryName(path);
+                }
+                var folders = Directory.GetDirectories(path);
+                var result = folders.FirstOrDefault((xx) => Regex.IsMatch(xx, "prefab"));
+                if (string.IsNullOrEmpty(result))
+                {
+                    continue;
+                }
+                if (paths.Count == 0 || !paths.Contains(path))
+                    paths.Add(path);
+            }
 
+            allAssetPaths = AssetDatabase.FindAssets("t:prefab t:Material", paths.ToArray()).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
+
+            ClearUnUsedTextures(paths);
+        }
+        GUILayout.Space(10);
+        if (GUILayout.Button("2清理重复资源", GUILayout.Height(50)))
+        {
+            
             CleanRepeatRes();
         }
-
-        if (GUILayout.Button("3回滚清理的资源"))
+        GUILayout.Space(10);
+        if (GUILayout.Button("3回滚清理的资源", GUILayout.Height(50)))
         {
-            EditorLogWindow.instance?.ClearLog();
+            EditorLogWindow.ClearLog();
             ReverseLocalSvn();
 
         }
-        if (GUILayout.Button("4打开日志"))
+        GUILayout.Space(10);
+        if (GUILayout.Button("4打开日志", GUILayout.Height(50)))
         {
             if (EditorLogWindow.GetInstance() == null)
             {
                 this.closeAction += EditorLogWindow.CloseWindow;
                 EditorLogWindow.OpenWindow(this);
+                EditorLogWindow.ClearLog();
             }
         }
-        if (GUILayout.Button("5清理日志"))
+        GUILayout.Space(10);
+        if (GUILayout.Button("5清理日志", GUILayout.Height(50)))
         {
-            EditorLogWindow.instance?.ClearLog();
+            EditorLogWindow.instance?.Focus();
+            EditorLogWindow.ClearLog();
         }
+        GUILayout.Space(10);
+        if (GUILayout.Button("6清理多余字体", GUILayout.Height(50)))
+        {
+            
+            var selFolders = GetSelectArtFolders();
+
+            allAssetPaths = AssetDatabase.FindAssets("t:prefab t:Material", new string[] { "Assets" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
+
+            var allFonts = AssetDatabase.FindAssets("t:font", new string[] { "Assets" }).Select((xx) =>
+            AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
+
+            List<string> hasRefenceFont = new();
+
+            foreach (var item in allAssetPaths)
+            {
+                if (!item.EndsWith("prefab") && !item.EndsWith(".Material"))
+                {
+                    continue;
+                }
+                if (allFonts.Contains(item)) continue;
+                var dps = AssetDatabase.GetDependencies(item);
+                var intersection = allFonts.Intersect(dps);
+                if (allFonts.Intersect(dps).Any())
+                {
+                    foreach (var it in intersection)
+                    {
+                        if (hasRefenceFont.Count == 0 || !hasRefenceFont.Contains(it))
+                            hasRefenceFont.Add(it);
+                    }
+                }
+            }
+            allFonts.RemoveAll(item => hasRefenceFont.Contains(item));
+
+            foreach (var item in allFonts)
+            {
+                EditorLogWindow.WriteLog(item);
+            }
+            EditorLogWindow.instance?.Focus();
+
+            // 获取字体的路径
+
+            foreach (var itemFont in allFonts)
+            {
+                // 获取字体依赖的资源（材质、贴图等）
+                string[] dependencies = AssetDatabase.GetDependencies(itemFont, true);
+
+                // 删除字体及其依赖资源
+                foreach (string dependency in dependencies)
+                {
+                    if (!dependency.EndsWith(".prefab"))
+                    {
+                        var source = Path.Combine(System.Environment.CurrentDirectory, dependency);
+                        if (!File.Exists(source))
+                        {
+                            continue;
+                        }
+                        EasyUseEditorFuns.UnitySaveCopyFile(
+                           source,
+                           Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, dependency),
+                            true);
+
+                        var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, dependency + ".path");
+                        // 用额外的txt文件记录该文件的路径 方便回退
+                        EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, dependency);
+                        AssetDatabase.DeleteAsset(dependency);
+                    }
+                }
+
+                var sourceFont = Path.Combine(System.Environment.CurrentDirectory, itemFont);
+                if (!File.Exists(sourceFont))
+                {
+                    continue;
+                }
+                EasyUseEditorFuns.UnitySaveCopyFile(
+                   sourceFont,
+                   Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, itemFont),
+                    true);
+
+                var metaFilePath2 = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, itemFont + ".path");
+                // 用额外的txt文件记录该文件的路径 方便回退
+                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath2, itemFont);
+                AssetDatabase.DeleteAsset(itemFont);
+
+            }
+            Debug.Log("处理完毕！");
+        }
+        GUILayout.EndVertical();
     }
-    private static void ClearUnUsedTextures()
+    public List<string> missingPrefab;
+    public void OnGUI()
+    {
+        GUILayout.BeginVertical();
+        selectPanel = GUILayout.Toolbar(selectPanel, namesPanel);  //参数1整数 参数2字符串数组
+        GUILayout.EndVertical();
+
+        GUILayout.BeginHorizontal();
+
+
+        EasyUseEditorFuns.baseVersion = EditorGUILayout.TextField("版本号：", EasyUseEditorFuns.baseVersion);
+
+        GUILayout.EndHorizontal();
+
+        if (selectPanel == 0)
+        {
+            DrawResMergeUI();
+        }
+        else if(selectPanel == 1)
+        {
+            if(GUILayout.Button("1查找missing的预设",GUILayout.Height(50)))
+            {
+                missingPrefab  = FindMissing.FindMissingScriptsInProject();
+            }
+            GUILayout.Space(10);
+            if (GUILayout.Button("2删除missing的预设",GUILayout.Height(50)))
+            {
+                FindMissing.CleanMissingScriptsInProject(missingPrefab);
+            }
+            GUILayout.Space(10);
+            if (GUILayout.Button("3回滚清理的资源", GUILayout.Height(50)))
+            {
+                EditorLogWindow.ClearLog();
+                ReverseLocalSvn();
+
+            }
+
+        }
+        else if(selectPanel == 2)
+        {
+            
+            inputWindowName = EditorGUILayout.TextField("窗口名:", inputWindowName,GUILayout.Width(355));
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("hash code =", GUILayout.Width(150));
+            inputWindowName_hashCode = Animator.StringToHash(inputWindowName);
+            EditorGUI.BeginChangeCheck();
+            inputWindowName_hashCode = EditorGUILayout.IntField(inputWindowName_hashCode,GUILayout.Width(200));
+            
+            if(GUILayout.Button("拷贝hash"))
+            {
+                GUIUtility.systemCopyBuffer = Animator.StringToHash(inputWindowName).ToString();
+            }
+            EditorGUILayout.EndHorizontal();
+
+
+
+
+            GetSelectFolders();
+            
+
+            GUILayout.BeginVertical();
+            for (int i = 0; i < checkChineseFolders.Count; i++)
+            {
+                GUILayout.BeginHorizontal();
+                checkChineseFolders[i] = EditorGUILayout.ObjectField(checkChineseFolders[i],
+                    typeof(DefaultAsset), false, GUILayout.Width(200));
+               
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.EndVertical();
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("处理中文字符"))
+            {
+                List<string> fileList = new();
+                foreach(var item  in selectFolderPaths)
+                {
+                   
+                    var allFiles =  System.IO.Directory.GetFiles(CommonUtils.GetLinuxPath(System.Environment.CurrentDirectory + "/" + item), "*.*",SearchOption.AllDirectories);
+                    allFiles = allFiles.Where((xx) => !xx.EndsWith(".meta") && (xx.EndsWith(".png") ||   xx.EndsWith(".jpg"))).ToArray();
+
+                    foreach(var li in allFiles)
+                    {
+                        if (!fileList.Contains(li))
+                        {
+                            fileList.Add(li);
+                        }
+                    }
+                }
+                try
+                {
+                    foreach (var file in fileList)
+                    {
+                        string pattern = @"[\u4e00-\u9fff]";
+                        if(Regex.IsMatch(file,pattern))
+                        {
+                            var file1 =  file.Substring(file.IndexOf("Assets/"));
+                            var newFile = Regex.Replace(file, pattern, "");
+                            var file2 = newFile.Substring(file.IndexOf("Assets/"));
+                            var ss = file;
+                            var tt = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, file.Substring(file.IndexOf("Assets/")));
+
+
+                            EasyUseEditorFuns.UnitySaveCopyFile(file, tt, true);
+                            var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, file1 + ".path");
+                            // 用额外的txt文件记录该文件的路径 方便回退
+                            EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, file1);
+                            EditorLogWindow.WriteLog(file);
+                        }
+                       
+                    }
+                    AssetDatabase.Refresh();
+
+                    foreach (var file in fileList)
+                    {
+                        string pattern = @"[\u4e00-\u9fff]";
+                        if (Regex.IsMatch(file, pattern))
+                        {
+                            var file1 = file.Substring(file.IndexOf("Assets/"));
+                            var newFile = Regex.Replace(file, pattern, "");
+                            var file2 = newFile.Substring(file.IndexOf("Assets/"));
+                            if (File.Exists(newFile))
+                            {
+                                Debug.LogError("需要清理资源" + newFile);
+                                AssetDatabase.DeleteAsset(newFile.Substring( newFile.IndexOf("Assets/")));
+                            }
+                            else
+                            {
+                                file2 = Path.GetFileName(file2);
+                                var value = AssetDatabase.RenameAsset(file1, file2);
+                                if (!string.IsNullOrEmpty(value))
+                                {
+                                    Debug.LogError(value + "重命名错误" + file1);
+                                }
+                            }
+
+
+                        }
+
+                    }
+                    AssetDatabase.Refresh();
+                }
+                catch (Exception  e)
+                {
+                    Debug.LogError(e.ToString());
+                }
+                
+            }
+            GUILayout.EndHorizontal();
+
+           
+
+            
+        }
+
+        if (GUILayout.Button("跳转到版本管理"))
+        {
+            EditorUtility.RevealInFinder(EasyUseEditorFuns.baseCustomTmpCache);
+        }
+
+    }
+    private static void ClearUnUsedTextures(List<string> paths)
     {
         // 获取所有资源
-        var allAssetPaths = AssetDatabase.FindAssets("t:Sprite", new string[] { "Assets" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
-
         List<string> unusedAssets = new List<string>();
+        var allTextures =  AssetDatabase.FindAssets("t:Sprite", paths.ToArray()).Select
+            ((xx)=>AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
 
-        foreach (string assetPath in allAssetPaths)
+        int index = 0;
+        foreach (string assetPath in allTextures)
         {
-            // 排除脚本和编辑器文件夹
-            if (assetPath.EndsWith(".cs") || assetPath.StartsWith("Assets/Editor"))
+            
+            EditorUtility.DisplayProgressBar(string.Format("Processing{0}/{1}", index, allTextures.Count), "", 1.0f* index / allTextures.Count);
+            if (!Regex.Match(assetPath,@"/image/").Success)
+            {
+                index++;
                 continue;
-
+            }
+            
             // 检查资源是否被引用
             if (!IsAssetUsed(assetPath))
             {
                 unusedAssets.Add(assetPath);
             }
+            index++;
         }
-
+        EditorUtility.ClearProgressBar();
         // 删除未使用的资源
         if (unusedAssets.Count > 0)
         {
@@ -248,18 +555,12 @@ public class FindRepeatRes : EditorWindow
         }
 
     }
-
+    public static List<string> allAssetPaths = new();
     private static bool IsAssetUsed(string assetPath)
     {
         // 获取所有场景和预制件
-        var allAssetPaths = AssetDatabase.FindAssets("t:prefab t:material", new string[] { "Assets" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
-
-
         foreach (string path in allAssetPaths)
         {
-            if (path.StartsWith("Assets/Editor"))
-                continue;
-
             // 加载资源
             var dependencies = AssetDatabase.GetDependencies(path);
 
@@ -377,7 +678,72 @@ public class FindRepeatRes : EditorWindow
         }
         return null;
     }
+    static List<string> GetSelectFolders()
+    {
+        if (Selection.assetGUIDs != null && Selection.assetGUIDs.Length > 0)
+        {
+            checkChineseFolders.Clear();
+            selectFolderPaths?.Clear();
+            foreach (var guid in Selection.assetGUIDs)
+            {
+                var tmpPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (System.IO.File.Exists(tmpPath))
+                {
+                    tmpPath = System.IO.Path.GetDirectoryName(tmpPath);
+                }
 
+                if (selectFolderPaths.Count == 0 || !selectFolderPaths.Contains(tmpPath))
+                {
+                    selectFolderPaths.Add(tmpPath);
+                    var assetObj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(tmpPath);
+                    checkChineseFolders.Add(assetObj);
+                }
+            }
+            return selectFolderPaths;
+        }
+        else
+        {
+            checkChineseFolders.Clear();
+            selectFolderPaths?.Clear();
+            return selectFolderPaths;
+        }
+    }
+
+
+    static List<string> GetSelectArtFolders()
+    {
+        if (Selection.assetGUIDs != null && Selection.assetGUIDs.Length > 0)
+        {
+            checkFolders.Clear();
+            selectFolderPaths?.Clear();
+            foreach (var guid in Selection.assetGUIDs)
+            {
+                var tmpPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (System.IO.File.Exists(tmpPath))
+                {
+                    tmpPath = System.IO.Path.GetDirectoryName(tmpPath);
+                }
+
+                if (selectFolderPaths.Count == 0 || !selectFolderPaths.Contains(tmpPath))
+                {
+                    selectFolderPaths.Add(tmpPath);
+                    var assetObj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(tmpPath);
+                    checkFolders.Add(assetObj);
+                }
+            }
+            return selectFolderPaths;
+        }
+        else
+        {
+            checkFolders.Clear();
+            selectFolderPaths?.Clear();
+            selectFolderPaths.Add("Assets/Art");
+            var assetObj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(selectFolderPaths[0]);
+            checkFolders.Add(assetObj);
+            return selectFolderPaths;
+        }
+       
+    }
 
     public static void CleanRepeatRes()
     {
@@ -391,15 +757,14 @@ public class FindRepeatRes : EditorWindow
 
         CollectAllCommonRes();
 
-
-        var allRes = AssetDatabase.FindAssets("t:prefab t:Material", new string[] {
-            "Assets/prefab1" ,
-            "Assets/prefab2" ,
-        });
+        var checkFolderPath = GetSelectArtFolders();
+        var allRes = AssetDatabase.FindAssets("t:prefab t:Material", checkFolderPath.ToArray());
         allRes = allRes.Select((xx) => xx = AssetDatabase.GUIDToAssetPath(xx)).ToArray<string>();
-
+        int index = 0;
+        EditorUtility.ClearProgressBar();
         foreach (var pathName in allRes)
         {
+            EditorUtility.DisplayProgressBar("阶段1收集主资源", string.Format("{0}/{1}", index, allRes.Length),1.0f* index++ / allRes.Length);
             var info = new MainResInfo();
             info.Init(pathName);
             //剔除自己和cs引用 获得纯资源引用 
@@ -420,18 +785,28 @@ public class FindRepeatRes : EditorWindow
                 allMainResList.Add(info);
             }
         }
+        EditorUtility.ClearProgressBar();
+
+        index = 0;
         foreach (var mainRes in allMainResList)
         {
+            EditorUtility.DisplayProgressBar("阶段2收集子资源", string.Format("{0}/{1}", index, allMainResList.Count), 1.0f * index++ / allMainResList.Count);
             foreach (var subRes in mainRes.childs)
             {
                 if (!likeSpriteResDepandence.ContainsKey(subRes.resPath))
                 {
+                    if(Regex.IsMatch(subRes.resPath,@"/icon/"))
+                    {
+                        continue;
+                    }
                     likeSpriteResDepandence.Add(subRes.resPath, new List<MainResInfo>());
                 }
                 likeSpriteResDepandence[subRes.resPath].Add(mainRes);
             }
         }
+        EditorUtility.ClearProgressBar();
 
+        index = 0;
 
 
         //由于 likeSpriteResDepandecen 的list数组中 可能某几个项都是一个功能目录 也就是
@@ -439,6 +814,7 @@ public class FindRepeatRes : EditorWindow
 
         foreach (var subRes in likeSpriteResDepandence)
         {
+            EditorUtility.DisplayProgressBar("阶段3子资源处理", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / likeSpriteResDepandence.Count);
             if (!spriteBeDepandence.ContainsKey(subRes.Key))
             {
                 spriteBeDepandence.Add(subRes.Key, new List<ComboMainResInfo>());
@@ -461,7 +837,9 @@ public class FindRepeatRes : EditorWindow
                 spriteBeDepandence[subRes.Key].Add(info);
             }
         }
+        EditorUtility.ClearProgressBar();
 
+        index = 0;
         // spriteBeDepandence  是子资源 map 一堆主资源的 映射
         // key是assetPath名 
         foreach (var item in spriteBeDepandence)
@@ -508,9 +886,11 @@ public class FindRepeatRes : EditorWindow
     /// </summary>
     static void DoReplace()
     {
-        //先copy到local版本   
+        //先copy到local版本
+        int index = 0; 
         foreach (var item in needDelTextureInfos)
         {
+            EditorUtility.DisplayProgressBar("阶段4存档", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / needDelTextureInfos.Count);
             // 先存档 本地版本管理 
             for (int i = 0; i < item.Value.Count; i++)
             {
@@ -527,10 +907,12 @@ public class FindRepeatRes : EditorWindow
                 }
             }
         }
-
+        index = 0;
+        EditorUtility.ClearProgressBar();
         AssetDatabase.Refresh(); // 刷新unity DB
         foreach (var item in needDelTextureInfos)
         {
+            EditorUtility.DisplayProgressBar("阶段5替换资源", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / needDelTextureInfos.Count);
             var needDelTextureRes = GetTextureInfo(item.Key);
 
             var targetRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);

@@ -63,11 +63,12 @@ public static class EasyUseEditorTool  // 简称euetool
         {
             GameObject.DestroyImmediate(copiedObject.transform.GetChild(i).gameObject);
         }
-        
 
+        var index = selected.transform.GetSiblingIndex() + 1; 
         // 设置父节点和位置
         copiedObject.transform.SetParent(selected.transform.parent,true);
-        if(copiedObject.transform is RectTransform it)
+        copiedObject.transform.SetSiblingIndex(index);
+        if (copiedObject.transform is RectTransform it)
         {
             it.offsetMin = (selected.transform as RectTransform).offsetMin;
             it.offsetMax = (selected.transform as RectTransform).offsetMax;
@@ -448,14 +449,6 @@ public static class EasyUseEditorTool  // 简称euetool
         }
     }
 
-    //[MenuItem("Assets/ui代码生成", false, 2000)]
-    //static private void UICodeGenerate()
-    //{
-    //    string title = "AutoGenerateScript";
-    //    GenerateScriptWindow window = EditorWindow.GetWindow<GenerateScriptWindow>(title);
-    //    window.minSize = new Vector2(150, 200);
-    //    window.Show();
-    //}
 
     [MenuItem("Assets/右键工具/选中物体被引用查找", false, 0)]
     static private void FindRefByGUIDAvatars()
@@ -464,6 +457,9 @@ public static class EasyUseEditorTool  // 简称euetool
     }
 
     
+
+
+
 
     static UnityEngine.Object LoadInHierarchy(string relativePath)
     {

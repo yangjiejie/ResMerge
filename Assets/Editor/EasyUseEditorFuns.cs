@@ -8,13 +8,13 @@ using UnityEditor.Build;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-public  class EasyUseEditorFuns
+public class EasyUseEditorFuns
 {
     //  public static string baseCustomTmpCache =  System.Environment.CurrentDirectory + "/../mySvn/" //+ //DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
 
 
     public static string _baseVersion;
-    public static string baseVersion 
+    public static string baseVersion
     {
         get
         {
@@ -23,7 +23,7 @@ public  class EasyUseEditorFuns
         }
         set
         {
-            if(_baseVersion != value)
+            if (_baseVersion != value)
             {
                 _baseVersion = value;
                 EditorPrefs.SetString(nameof(baseVersion), value);
@@ -31,7 +31,7 @@ public  class EasyUseEditorFuns
         }
     }
 
-  
+
     public static string baseCustomTmpCache
     {
         get
@@ -52,7 +52,7 @@ public  class EasyUseEditorFuns
     /// <param name="source 需要全路径"></param>
     /// <param name="target 需要全路径"></param>
     /// <param name="overrite"></param>
-    public static void UnitySaveCopyFile(string source,string target,bool overrite = true)
+    public static void UnitySaveCopyFile(string source, string target, bool overrite = true)
     {
         source = GetLinuxPath(source);
         target = GetLinuxPath(target);
@@ -61,7 +61,7 @@ public  class EasyUseEditorFuns
         sourceFolder = Path.GetFullPath(sourceFolder);
         targetFolder = Path.GetFullPath(targetFolder);
         CreateDir(sourceFolder);
-        CreateDir(targetFolder); 
+        CreateDir(targetFolder);
 
         var sourceName = System.IO.Path.GetFileName(source);
         var targetName = System.IO.Path.GetFileName(target);
@@ -78,7 +78,7 @@ public  class EasyUseEditorFuns
     /// </summary>
     /// <param name="resPath"></param>
     /// <param name="isSaveToLocal"></param>
-    public static void DelEditorResFromDevice(string resPath,bool isSaveToLocal = true)
+    public static void DelEditorResFromDevice(string resPath, bool isSaveToLocal = true)
     {
         try
         {
@@ -90,12 +90,13 @@ public  class EasyUseEditorFuns
                 var source = Path.Combine(System.Environment.CurrentDirectory, resPath);
                 var target = Path.Combine(baseCustomTmpCache, resPath);
                 UnitySaveCopyFile(source, target, true);
-                
-                var metaFilePath  = Path.Combine(baseCustomTmpCache, resPath + ".path");
+
+                var metaFilePath = Path.Combine(baseCustomTmpCache, resPath + ".path");
                 // 用额外的txt文件记录该文件的路径 方便回退
                 WriteFileToTargetPath(metaFilePath, resPath);
             }
-            File.Delete(Path.Combine(System.Environment.CurrentDirectory, resPath));
+            AssetDatabase.DeleteAsset(resPath);
+            AssetDatabase.DeleteAsset(resPath + ".meta");
         }
         catch (System.Exception e)
         {
@@ -228,16 +229,20 @@ public  class EasyUseEditorFuns
     /// </summary>
     /// <param name="filePath"></param>
     /// <param name="contents"></param>
-    public static void WriteFileToTargetPath(string filePath,string contents)
+    public static void WriteFileToTargetPath(string filePath, string contents)
     {
         filePath = Path.GetFullPath(filePath);
         var folderName = System.IO.Path.GetDirectoryName(filePath);
-        if(!Directory.Exists(folderName))
+        if (!Directory.Exists(folderName))
         {
             CreateDir(folderName);
         }
         File.WriteAllText(filePath, contents);
-        EditorLogWindow.instance?.WriteLog(filePath.Replace(".path", ""));
+        var writeFilePath = CommonUtils.GetLinuxPath(baseCustomTmpCache);
+        filePath = filePath.Replace(baseCustomTmpCache + "/", "");
+
+
+        EditorLogWindow.WriteLog(filePath.Replace(".path", ""));
     }
 
     public static int CreateDir(string path)
@@ -264,7 +269,7 @@ public  class EasyUseEditorFuns
         return Selection.activeGameObject;
     }
 
-    public static string GetNodePath( GameObject go)
+    public static string GetNodePath(GameObject go)
     {
         var parent = go.transform.parent;
         return parent == null ? go.name : GetNodePath(parent.gameObject) + "/" + go.name;
@@ -282,7 +287,7 @@ public  class EasyUseEditorFuns
         return goes;
     }
 
-    
+
     public static List<string> GetSelFoloderPath()
     {
         UnityEngine.Object[] selObjs = Selection.GetFiltered(
@@ -292,7 +297,7 @@ public  class EasyUseEditorFuns
     }
     public static List<GameObject> GetSelectPrefabs() // 也可以用于选中单个prefab
     {
-        
+
         List<GameObject> tmp = new List<GameObject>();
         var gos = Selection.GetFiltered(typeof(UnityEngine.Object), SelectionMode.DeepAssets);
         foreach (var go in gos)
@@ -414,7 +419,7 @@ public  class EasyUseEditorFuns
     /// <param name="type">类的类型</param>
     /// <param name="method">类里要调用的方法名</param>
     /// <param name="parameters">调用方法传入的参数</param>
-   
+
     public static object InvokePublicStaticMethod(System.Type type, string method, params object[] parameters)
     {
         var methodInfo = type.GetMethod(method, BindingFlags.Public | BindingFlags.Static);
@@ -471,7 +476,7 @@ public  class EasyUseEditorFuns
                 Debug.Log($"预设 {path} 中有 {missingComponents.Count} 个丢失的脚本:");
                 foreach (var component in missingComponents)
                 {
-                    if(component != null)
+                    if (component != null)
                         Debug.Log($"- 丢失的脚本: {component.name}");
                 }
             }
