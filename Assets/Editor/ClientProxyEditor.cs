@@ -14,11 +14,12 @@ public class ClientProxyEditor : Editor
     string[] defineArray = new string[]
     {
         "",
-        "ENABLE_ODIN_PLUGIN",
+        "ENABLE_ODIN_PLUGIN",  
         "DEV_MODE",
         "FRUIT_DEBUG",
         "EDITOR_OPEN_HIERARCHY_DRAW_ICON",
         "DEV_DEBUG_NET", // 网络调试   
+        "VIP_DEBUG", // 测试vip   
         
     };
 

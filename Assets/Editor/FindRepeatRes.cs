@@ -14,6 +14,13 @@ public class FindRepeatRes : EditorWindow
 {
     private string inputWindowName;
     private int inputWindowName_hashCode;
+
+    private string guidStr;
+    private string guidToAssetPath = "路径：";
+
+    private string sourceUUid; 
+    private string targetUUid;
+    private List<string> beReplaceMainRes = new(); // 被替换的主体资源（prefab mat）
     public class MergedTextureInfo
     {
         public string md5Code;
@@ -195,15 +202,15 @@ public class FindRepeatRes : EditorWindow
         {
             
             allAssetPaths.Clear();
+            dependenciesMap.Clear();
             if (checkFolders == null || checkFolders.Count == 0) return;
             List<string> paths = new();
             foreach (var item in checkFolders)
             {
                 var path = AssetDatabase.GetAssetPath(item);
-                if (Regex.IsMatch(path, @"/image/") || Regex.IsMatch(path, @"/icon/"))
+                if ( Regex.IsMatch(path, @"/icon/"))
                 {
-                    //Debug.LogError("目录不正确不能含有icon和image");
-                    //EditorGUILayout.HelpBox("目录不正确不能含有icon和image", MessageType.Error);
+                    //Debug.LogError("目录不正确不能含有icon");
                     continue;
                 }
                 if (File.Exists(path))
@@ -220,7 +227,7 @@ public class FindRepeatRes : EditorWindow
                     paths.Add(path);
             }
 
-            allAssetPaths = AssetDatabase.FindAssets("t:prefab t:Material", paths.ToArray()).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
+            allAssetPaths = AssetDatabase.FindAssets("t:prefab t:Material", new string[] {"Assets/" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
 
             ClearUnUsedTextures(paths);
         }
@@ -394,13 +401,7 @@ public class FindRepeatRes : EditorWindow
                 GUIUtility.systemCopyBuffer = Animator.StringToHash(inputWindowName).ToString();
             }
             EditorGUILayout.EndHorizontal();
-
-
-
-
             GetSelectFolders();
-            
-
             GUILayout.BeginVertical();
             for (int i = 0; i < checkChineseFolders.Count; i++)
             {
@@ -491,9 +492,68 @@ public class FindRepeatRes : EditorWindow
             }
             GUILayout.EndHorizontal();
 
-           
+            GUILayout.BeginVertical();
 
-            
+            EditorGUI.BeginChangeCheck();
+
+            guidStr = EditorGUILayout.TextField("输入guid",guidStr);
+
+            EditorGUILayout.LabelField(guidToAssetPath);
+            if (EditorGUI.EndChangeCheck())
+            {
+                guidToAssetPath = AssetDatabase.GUIDToAssetPath(guidStr);
+                if (string.IsNullOrEmpty(guidToAssetPath))
+                {
+                    guidToAssetPath = "路径：no asset!";
+                }
+                else
+                {
+                    guidToAssetPath = "路径："+ guidToAssetPath;
+                }
+
+            }
+            sourceUUid = EditorGUILayout.TextField("被替换的uuid", sourceUUid);
+            targetUUid = EditorGUILayout.TextField("替换的uuid", targetUUid);
+
+            if (GUILayout.Button("查找uuid的主体资源"))
+            {
+                EditorLogWindow.ClearLog();
+                if (allAssetPaths.Count == 0)
+                {
+                    allAssetPaths = AssetDatabase.FindAssets("t:prefab t:Material", new string[] { "Assets/" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
+                }
+                EditorUtility.ClearProgressBar();
+                int index = 0; 
+                foreach (var item in allAssetPaths)
+                {
+                    EditorUtility.DisplayProgressBar("遍历所有主体资源", string.Format("{0}/{1}", index, allAssetPaths.Count), 1.0f * index++ / allAssetPaths.Count);
+                    var fullPath = CommonUtils.GetLinuxPath(Path.Combine(System.Environment.CurrentDirectory, item));
+                    var allContent = File.ReadAllText(fullPath);
+
+                    if(Regex.IsMatch(allContent,sourceUUid))
+                    {
+                        beReplaceMainRes.Add(fullPath);
+                        EditorLogWindow.WriteLog(fullPath);
+                    }
+                }
+                EditorUtility.ClearProgressBar();
+
+            }
+            if (GUILayout.Button("替换uuid"))
+            {
+                foreach(var item in beReplaceMainRes)
+                {
+                    var allContent = File.ReadAllText(item);
+                    var newContent = Regex.Replace(allContent, sourceUUid, targetUUid);
+                    File.WriteAllText(item, newContent);
+                }
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+            }
+
+
+
+            GUILayout.EndVertical();
         }
 
         if (GUILayout.Button("跳转到版本管理"))
@@ -556,16 +616,40 @@ public class FindRepeatRes : EditorWindow
 
     }
     public static List<string> allAssetPaths = new();
+    public static Dictionary<string, List<string>> dependenciesMap = new();
     private static bool IsAssetUsed(string assetPath)
     {
+
+        foreach(var item in dependenciesMap)
+        {
+            var path = item.Key;
+            var tmpDenpendencies = item.Value;
+            if(tmpDenpendencies.Contains(assetPath))
+            {
+                return true;
+            }
+        }
         // 获取所有场景和预制件
         foreach (string path in allAssetPaths)
         {
             // 加载资源
+            if(dependenciesMap.ContainsKey(path))
+            {
+                continue;
+            }
             var dependencies = AssetDatabase.GetDependencies(path);
+            if(!dependenciesMap.ContainsKey(path))
+            {
+                dependenciesMap.Add(path, new List<string>());
+            }
 
+           
             foreach (var obj in dependencies)
             {
+                if(obj != null && !dependenciesMap[path].Contains(obj))
+                {
+                    dependenciesMap[path].Add(obj);
+                }
                 if (obj != null && obj == assetPath)
                 {
                     return true;
