@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-
+using PlasticGui.WebApi.Responses;
 using UnityEditor;
 using UnityEngine;
 
@@ -21,7 +21,12 @@ public class EditorLogWindow : EditorWindow
         if (textList.Count == 0 || !textList.Contains(str))
         {
             str = str.Replace("\\", "/");
-            var realPath = str.Substring(str.IndexOf("Assets/"));
+            int index = str.IndexOf("Assets/");
+            if(index < 0)
+            {
+                return;
+            }
+            var realPath = str.Substring(index >=0 ? index : 0);
             
             FileInfo fileInfo = new FileInfo(System.Environment.CurrentDirectory +"/" +realPath);
             float singleSize = fileInfo.Length / (1024.0f );

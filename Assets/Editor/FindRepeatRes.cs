@@ -1035,8 +1035,8 @@ public class FindRepeatRes : EditorWindow
             // 用额外的txt文件记录该文件的路径 方便回退
             EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, targetCommonPath);
             // end 
-            //很遗憾 merged容器中也会被删除 ，hasMergedRes 
-         //   hasMergedRes.Key.DelFromDevice();
+           
+           
             mergeedSpriteBeDepandence.Remove(hasMergedRes.Key);
             var newCommonInfo = GetTextureInfo(EasyUseEditorFuns.GetUnityAssetPath(targetCommonPath));
             if (!mergeedSpriteBeDepandence.ContainsKey(newCommonInfo))
