@@ -17,6 +17,7 @@ public class EditorLogWindow : EditorWindow
     private static float totalResLength = 0; 
     public static void   WriteLog(string str)
     {
+        if (string.IsNullOrEmpty(str)) return;
         if (textList.Count == 0 || !textList.Contains(str))
         {
             str = str.Replace("\\", "/");

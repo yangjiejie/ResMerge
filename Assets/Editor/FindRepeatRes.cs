@@ -819,7 +819,7 @@ public class FindRepeatRes : EditorWindow
 
     public static void CleanRepeatRes()
     {
-        SafeDeleteUnityResHook.forbidHook = true;
+       
         allMainResList?.Clear();
         allSubInfoLists?.Clear();
         allCommonSubInfoList?.Clear();
@@ -971,7 +971,7 @@ public class FindRepeatRes : EditorWindow
         }
        
 
-        SafeDeleteUnityResHook.forbidHook = false;
+        
     }
     /// <summary>
     /// 执行资源的清理工作 
