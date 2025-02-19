@@ -1036,7 +1036,7 @@ public class FindRepeatRes : EditorWindow
             EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, targetCommonPath);
             // end 
             //很遗憾 merged容器中也会被删除 ，hasMergedRes 
-           // hasMergedRes.Key.DelFromDevice();
+         //   hasMergedRes.Key.DelFromDevice();
             mergeedSpriteBeDepandence.Remove(hasMergedRes.Key);
             var newCommonInfo = GetTextureInfo(EasyUseEditorFuns.GetUnityAssetPath(targetCommonPath));
             if (!mergeedSpriteBeDepandence.ContainsKey(newCommonInfo))
@@ -1069,7 +1069,7 @@ public class FindRepeatRes : EditorWindow
                 for (int j = 0; j < item.Value[i].editorResInfos.Count; j++)
                 {
 
-                  //  EditorResReplaceByUuid.ReplaceUUID(item.Value[i].editorResInfos[j].resPath, needDelTextureRes.uuid, hasMergedResUUid);
+                    EditorResReplaceByUuid.ReplaceUUID(item.Value[i].editorResInfos[j].resPath, needDelTextureRes.uuid, hasMergedResUUid);
 
                 }
             }
@@ -1077,7 +1077,7 @@ public class FindRepeatRes : EditorWindow
             sb.Append("当前正在处理第" + index + "个文件");
             sb.Append(",文件名为" + needDelTextureRes.resPath);
             File.AppendAllText("D:/清理重复资源.txt", sb.ToString());
-         //    needDelTextureRes.DelFromDevice(); // 从磁盘上删除 
+             needDelTextureRes.DelFromDevice(); // 从磁盘上删除 
 
             Debug.Log("需要删除" + item.Key);
         }
