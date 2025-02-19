@@ -1,12 +1,11 @@
-/*
- * http://www.manew.com/thread-102160-1-1.html 游戏蛮牛
- */
+
 #if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
-using System;
-using Spine.Unity;
+
 using System.Linq;
+
+
 
 [InitializeOnLoad]
 public static class DrawHierarchyIcon
@@ -53,54 +52,14 @@ public static class DrawHierarchyIcon
         GameObject go = EditorUtility.InstanceIDToObject(instanceID) as GameObject;
         if (go != null )
         {
-            if(go.GetComponent<UIPanelBase>() != null)
+            if(go.GetComponent<Main>() != null)
             {
                 Rect position = new Rect(selectionRect);
                 position.x = position.width + (selectionRect.x - 80);
                 position.width = 80;
                 position.height = 16f;
-
-                Rect pos2 = new Rect(position);
-                pos2.x += 40;
-                pos2.width = 60;
-                GUI.Label(position, "主ui");
-                if(GUI.Button(pos2, "openC#"))
-                {
-                    var csName = go.GetComponent<UIPanelBase>().GetType().Name;
-                    var guids  = AssetDatabase.FindAssets($"t:Script {csName}", new string[] { "Assets/hot_fix" });
-                    var listPath = guids.Select((x) => AssetDatabase.GUIDToAssetPath(x)).ToList<string>();
-                    string targetCsFile = "";
-                    foreach (var item in listPath)
-                    {
-                        if(!item.Contains("generate"))
-                        {
-                            targetCsFile = item;
-                            break;
-                        }
-                    }
-                    if(!string.IsNullOrEmpty(targetCsFile))
-                    {
-                        Application.OpenURL(System.Environment.CurrentDirectory + "/" + targetCsFile);
-                    }
-                }
+                GUI.Label(position, "游戏入口");    
             }
-            else if(go.GetComponent<ManagedBehaviour>() != null)
-            {
-                Rect position = new Rect(selectionRect);
-                position.x = position.width + (selectionRect.x - 80);
-                position.width = 80;
-                position.height = 16f;
-                GUI.Label(position, "子ui");
-            }
-            else if(go.GetComponent<SkeletonGraphic>() != null || go.GetComponent<SkeletonAnimation>())
-            {
-                Rect position = new Rect(selectionRect);
-                position.x = position.width + (selectionRect.x - 80);
-                position.width = 80;
-                position.height = 16f;
-                GUI.Label(position, "spine");
-            }
-            
         }
         
 

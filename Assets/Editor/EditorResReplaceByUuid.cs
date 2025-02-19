@@ -13,6 +13,11 @@ public class EditorResReplaceByUuid
             Debug.LogError("请指定 UUID A 和 UUID B！");
             return;
         }
+        if (uuidA == uuidB)
+        {
+            Debug.LogError("不用替换uuidA == uuidB！");
+            return;
+        }
         string[] allAssetPaths = null;
         if (string.IsNullOrEmpty(resPath))
         {

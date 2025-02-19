@@ -8,9 +8,12 @@ using UnityEditor.Build;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using UnityEditor.SceneManagement;
+using System.Linq;
+
 public class EasyUseEditorFuns
 {
-    //  public static string baseCustomTmpCache =  System.Environment.CurrentDirectory + "/../mySvn/" //+ //DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
+    
 
 
     public static string _baseVersion;
@@ -47,31 +50,116 @@ public class EasyUseEditorFuns
         return s.Replace("\\", "/");
     }
     /// <summary>
+    /// 获取unity资源路径 
+    /// </summary>
+    /// <param name="fullPath全路径"></param>
+    /// <returns></returns>
+    public static string GetUnityAssetPath( string fullPath)
+    {
+        return fullPath.Substring(fullPath.IndexOf("Assets/"));
+    }
+
+    /// <summary>
     /// 拷贝unity的文件从source到taget 并且也拷贝meta文件
     /// </summary>
-    /// <param name="source 需要全路径"></param>
-    /// <param name="target 需要全路径"></param>
+    /// <param name="source 绝对路径"></param>
+    /// <param name="target 绝对路径"></param>
     /// <param name="overrite"></param>
-    public static void UnitySaveCopyFile(string source, string target, bool overrite = true)
+    /// <param name="withPathMetaFile 若为true则会自动写入.path文件记录之前所在的文件夹"></param> 
+    public static void UnitySaveMoveFile(string source, string target, bool overrite = true, bool withMetaFile = true, bool withPathMetaFile = false)
     {
-        source = GetLinuxPath(source);
-        target = GetLinuxPath(target);
-        var sourceFolder = System.IO.Path.GetDirectoryName(source);
-        var targetFolder = System.IO.Path.GetDirectoryName(target);
-        sourceFolder = Path.GetFullPath(sourceFolder);
-        targetFolder = Path.GetFullPath(targetFolder);
-        CreateDir(sourceFolder);
-        CreateDir(targetFolder);
+        try
+        {
+            source = GetLinuxPath(source);
+            target = GetLinuxPath(target);
+            var sourceFolder = System.IO.Path.GetDirectoryName(source);
+            var targetFolder = System.IO.Path.GetDirectoryName(target);
+            sourceFolder = Path.GetFullPath(sourceFolder);
+            targetFolder = Path.GetFullPath(targetFolder);
+            CreateDir(sourceFolder);
+            CreateDir(targetFolder);
 
-        var sourceName = System.IO.Path.GetFileName(source);
-        var targetName = System.IO.Path.GetFileName(target);
-        //拷贝源文件  
-        System.IO.File.Copy(source, target, overrite);
-        Regex.Match(source, @"\.([a-zA-Z0-9]+)$");
-        //拷贝meta文件 
-        var metaSourceFile = Path.Combine(sourceFolder, sourceName + ".meta");
-        var metaTargeFile = Path.Combine(targetFolder, targetName + ".meta");
-        System.IO.File.Copy(metaSourceFile, metaTargeFile, overrite);
+            var sourceName = System.IO.Path.GetFileName(source);
+            var targetName = System.IO.Path.GetFileName(target);
+            //拷贝源文件  
+            if(File.Exists(target))
+            {
+                File.Delete(target);
+            }
+            System.IO.File.Move(source, target);
+            //拷贝meta文件 
+            if (withMetaFile)
+            {
+                var metaSourceFile = Path.Combine(sourceFolder, sourceName + ".meta");
+                var metaTargeFile = Path.Combine(targetFolder, targetName + ".meta");
+                if(File.Exists(metaTargeFile))
+                {
+                    File.Delete(metaTargeFile);
+                }
+                System.IO.File.Move(metaSourceFile, metaTargeFile);
+            }
+            if (withPathMetaFile)
+            {
+                var metaFilePath2 = target + ".path";
+                var targetUnityAssetPathName = target.Substring(target.IndexOf("Assets/"));
+                // 用额外的txt文件记录该文件的路径 方便回退
+                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath2, targetUnityAssetPathName);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError(source + "\n" + e);
+        }
+
+
+    }
+   
+    /// 
+    /// <summary>
+    /// 拷贝unity的文件从source到taget 并且也拷贝meta文件
+    /// </summary>
+    /// <param name="source 绝对路径"></param>
+    /// <param name="target 绝对路径"></param>
+    /// <param name="overrite"></param>
+    /// <param name="withPathMetaFile 若为true则会自动写入.path文件记录之前所在的文件夹"></param> 
+    public static void UnitySaveCopyFile(string source, string target, bool overrite = true,bool withMetaFile = true,bool withPathMetaFile = false)
+    {
+        try
+        {
+            source = GetLinuxPath(source);
+            target = GetLinuxPath(target);
+            var sourceFolder = System.IO.Path.GetDirectoryName(source);
+            var targetFolder = System.IO.Path.GetDirectoryName(target);
+            sourceFolder = Path.GetFullPath(sourceFolder);
+            targetFolder = Path.GetFullPath(targetFolder);
+            CreateDir(sourceFolder);
+            CreateDir(targetFolder);
+
+            var sourceName = System.IO.Path.GetFileName(source);
+            var targetName = System.IO.Path.GetFileName(target);
+            //拷贝源文件  
+            System.IO.File.Copy(source, target, overrite);
+            //拷贝meta文件 
+            if (withMetaFile)
+            {
+                var metaSourceFile = Path.Combine(sourceFolder, sourceName + ".meta");
+                var metaTargeFile = Path.Combine(targetFolder, targetName + ".meta");
+                System.IO.File.Copy(metaSourceFile, metaTargeFile, overrite);
+            }
+            if (withPathMetaFile)
+            {
+                var metaFilePath2 = target + ".path";
+                var targetUnityAssetPathName = target.Substring(target.IndexOf("Assets/"));
+                // 用额外的txt文件记录该文件的路径 方便回退
+                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath2, targetUnityAssetPathName);
+            }
+        }
+        catch(Exception e)
+        {
+            Debug.LogError(source +"\n"+ e);
+        }
+        
+        
     }
     /// <summary>
     /// 参数2 是否存档 
@@ -84,19 +172,9 @@ public class EasyUseEditorFuns
         {
             if (!isSaveToLocal)
                 Debug.Log($"{resPath}已删除且不存档");
-            else
-            {
-                //拷贝到相关目录 会包含meta 
-                var source = Path.Combine(System.Environment.CurrentDirectory, resPath);
-                var target = Path.Combine(baseCustomTmpCache, resPath);
-                UnitySaveCopyFile(source, target, true);
 
-                var metaFilePath = Path.Combine(baseCustomTmpCache, resPath + ".path");
-                // 用额外的txt文件记录该文件的路径 方便回退
-                WriteFileToTargetPath(metaFilePath, resPath);
-            }
-            AssetDatabase.DeleteAsset(resPath);
-            AssetDatabase.DeleteAsset(resPath + ".meta");
+            File.Delete(resPath);
+            File.Delete(resPath + ".meta"); 
         }
         catch (System.Exception e)
         {
@@ -219,6 +297,7 @@ public class EasyUseEditorFuns
 
             }
         }
+     
         PlayerSettings.SetScriptingDefineSymbols(nameBt, symbles);
 
         AssetDatabase.Refresh();
@@ -227,10 +306,11 @@ public class EasyUseEditorFuns
     /// <summary>
     /// 任何情况下都需要能写入一个文件
     /// </summary>
-    /// <param name="filePath"></param>
-    /// <param name="contents"></param>
+    /// <param name="filePath 全路径"></param>
+    /// <param name="contents unity资源路径"></param>
     public static void WriteFileToTargetPath(string filePath, string contents)
     {
+        contents = GetUnityAssetPath(contents);
         filePath = Path.GetFullPath(filePath);
         var folderName = System.IO.Path.GetDirectoryName(filePath);
         if (!Directory.Exists(folderName))
@@ -238,7 +318,7 @@ public class EasyUseEditorFuns
             CreateDir(folderName);
         }
         File.WriteAllText(filePath, contents);
-        var writeFilePath = CommonUtils.GetLinuxPath(baseCustomTmpCache);
+        var writeFilePath = EasyUseEditorFuns.GetLinuxPath(baseCustomTmpCache);
         filePath = filePath.Replace(baseCustomTmpCache + "/", "");
 
 
@@ -503,6 +583,87 @@ public class EasyUseEditorFuns
         }
     }
 #endif
+    
+    public static void DelFolderAllContens(string directoryPath)
+    {
+        // 检查目录是否存在
+        if (Directory.Exists(directoryPath))
+        {
+            // 删除目录下的所有文件
+            string[] files = Directory.GetFiles(directoryPath);
+            foreach (string file in files)
+            {
+                File.Delete(file);
+            }
+
+            // 递归删除所有子目录及其内容
+            string[] subDirectories = Directory.GetDirectories(directoryPath);
+            foreach (string subDirectory in subDirectories)
+            {
+                DelFolderAllContens(subDirectory);
+                Directory.Delete(subDirectory);
+            }
+        }
+    }
+
+    public static bool IsFormatCorrect(out bool isInPrefabStage)
+    {
+        UnityEngine.Object selectedObject = Selection.activeObject;
+        if (selectedObject != null)
+        {
+            string path = AssetDatabase.GetAssetPath(selectedObject);
+            if (!string.IsNullOrEmpty(path))
+            {
+                string extension = System.IO.Path.GetExtension(path).ToLower();
+                if (extension.Contains(".prefab"))
+                {
+                    isInPrefabStage = false;
+                    return true;
+                }
+            }
+            else
+            {
+                if (Regex.IsMatch(selectedObject.name, selectedObject.name) &&
+                PrefabStageUtility.GetCurrentPrefabStage() != null &&
+                selectedObject as GameObject != null && (selectedObject as GameObject).transform.parent.name.Contains("(Environment)"))
+                {
+                    isInPrefabStage = true;
+                    return true;
+
+                }
+            }
+
+
+        }
+        isInPrefabStage = false;
+        return false;
+    }
+
+    public static  void GetSpineDependency()
+    {
+        var resPath = AssetDatabase.GetAssetPath(Selection.activeObject);
+
+        var folderName = System.IO.Path.GetDirectoryName(resPath);
+
+        var dependency = AssetDatabase.GetDependencies(resPath).Where((xx) => xx != resPath && !xx.EndsWith(".cs") && !xx.EndsWith(".shader") && !xx.StartsWith("Assets/3rdParty/Spine")).ToList();
+        bool hasReferency = false;
+        foreach(var item in dependency)
+        {
+            if(!item.Contains(folderName))
+            {
+                hasReferency = true;
+                break;
+            }
+            
+        }
+        StringBuilder sb = new();
+        dependency.ForEach((xx) => sb.AppendLine(xx));
+        Debug.Log("依赖：" + sb.ToString());
+        if(hasReferency)
+        {
+            Debug.Log("引用不为空");
+        }
+    }
 
 }
 

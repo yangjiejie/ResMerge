@@ -70,12 +70,6 @@ public static void ChangeSolution(Vector2 size)
     GameViewTools.CheckCustomSizeEveryOnce(size);
     GameViewTools.ChangeResolution(size.x < size.y ? GameViewTools.landScapeIndex : GameViewTools.portraitIndex);
 }
-    public  static void ChangeSolution(bool islandScape)
-{
-    GameViewTools.InitiaLized();
-    GameViewTools.CheckCustomSizeEveryOnce();
-    GameViewTools.ChangeResolution(islandScape ? GameViewTools.landScapeIndex : GameViewTools.portraitIndex);
-}
 
 public static void InitiaLized()
 {

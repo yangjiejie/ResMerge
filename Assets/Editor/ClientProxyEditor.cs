@@ -1,5 +1,5 @@
 using System;
-using Launcher;
+
 using UnityEditor;
 using UnityEngine;
 using Application = UnityEngine.Application;
@@ -20,7 +20,7 @@ public class ClientProxyEditor : Editor
         "EDITOR_OPEN_HIERARCHY_DRAW_ICON",
         "DEV_DEBUG_NET", // 网络调试   
         "VIP_DEBUG", // 测试vip   
-        
+        "UNITASK_DOTWEEN_SUPPORT", // DoTween UniTask
     };
 
     private void OnEnable()

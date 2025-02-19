@@ -44,6 +44,12 @@ public class PrefabHelper
             GameObject.DestroyImmediate(rawImage.gameObject);
         }
 
+        rawImage = root.transform.Find("ViewTheImage2");
+        if (rawImage != null)
+        {
+            GameObject.DestroyImmediate(rawImage.gameObject);
+        }
+
         var origin = root.transform.Find("origin");
         if (origin == null) return;
 
@@ -68,6 +74,12 @@ public class PrefabHelper
 #endif
         childs.Clear();
         GameObject.DestroyImmediate(origin.gameObject);
+        origin = root.transform.Find("origin2");
+        if(origin != null)
+        {
+            GameObject.DestroyImmediate(origin.gameObject);
+        }
+        
         // SCGTool.RemoveNoUseRayCast(root);
         Object prefabObj = PrefabUtility.SaveAsPrefabAsset(root, ps.assetPath,out bool success);
         if(success)

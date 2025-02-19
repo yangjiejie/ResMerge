@@ -11,7 +11,9 @@ using System.Security.Cryptography;
 
 
 
+
 using UnityEditor.SceneManagement;
+
 
 
 
@@ -20,6 +22,7 @@ public static class EasyUseEditorTool  // 简称euetool
 
     static Component[] copiedComponents;
     private static List<string> matchFiles = new List<string>();
+    private static List<string> findRstList = new();
     private static string[] sertchPaths = new string[] { Application.dataPath };	//搜索路径;
 
     public static string[] matchExtensions = new string[] { ".prefab", ".mat" }; //需要进行匹配的格式
@@ -125,30 +128,6 @@ public static class EasyUseEditorTool  // 简称euetool
         EditorUtility.RevealInFinder(newpath);
        
     }
-  
-
-
-  
-
-    [MenuItem("CONTEXT/Transform/删除所有组件除了trans本身")]
-    static void DeleteAllComButTransform(MenuCommand cmd)
-    {
-
-        var go = (cmd.context as Transform).gameObject;
-
-        var coms = go.GetComponents<Component>();
-        foreach (var one in coms)
-        {
-            if (one is Transform)
-            {
-                continue;
-            }
-            GameObject.DestroyImmediate(one);
-        }
-        EditorUtility.SetDirty(go);
-    }
-  
-
 
     [MenuItem("Tools/EasyUseEditorTool/打开存档目录", priority = 0)]
     static void OpenpersistentFolder()
@@ -414,6 +393,7 @@ public static class EasyUseEditorTool  // 简称euetool
             string guid = AssetDatabase.AssetPathToGUID(path);
             int startIndex = 0;
             matchFiles.Clear();
+            findRstList.Clear();
             foreach (var item in sertchPathsRaw)
             {
                 string[] files = Directory.GetFiles(item + "", "*.*", SearchOption.AllDirectories)
@@ -432,7 +412,7 @@ public static class EasyUseEditorTool  // 简称euetool
                         var startCount = file.IndexOf("/Assets");
                         var newFilePath = file.Substring(startCount + 1);
                         Debug.Log(file, LoadInHierarchy(newFilePath));
-
+                        findRstList.Add(file);
                     }
 
                     startIndex++;
@@ -442,6 +422,9 @@ public static class EasyUseEditorTool  // 简称euetool
                         EditorApplication.update = null;
                         startIndex = 0;
                         Debug.Log("<color=#006400>查找结束" + Selection.activeObject.name + "</color>");
+                        StringBuilder sb = new StringBuilder();
+                        findRstList.ForEach((xx) => sb.AppendLine(xx));
+                        GUIUtility.systemCopyBuffer = sb.ToString();
                     }
                 };
             else
@@ -456,7 +439,145 @@ public static class EasyUseEditorTool  // 简称euetool
         FindRefByGUIDRaw(new string[] { Application.dataPath , });
     }
 
-    
+    [MenuItem("Assets/右键工具/跳转到c#对应的行 _F12", false, 0)]
+    static private void GotoCSharpCodeLine()
+    {
+        var go = Selection.activeGameObject;
+        if (go == null) return;
+        string varName = "";
+        //匹配  结点名@类型名 中的 结点名@ 
+        if(Regex.Match(go.transform.name, @"^(.*?)@").Success)
+        {
+            varName = Regex.Match(go.name, @"^(.*?)@").Groups[1].Value;
+        }
+        else
+        {
+            varName = go.name;
+        }
+
+        GameObject selectGo = null;
+        var csName = "";
+        if(PrefabStageUtility.GetCurrentPrefabStage() != null)
+        {
+            var RunGo = go.transform;
+            while (RunGo.transform.parent.parent != null)
+            {
+                RunGo = RunGo.transform.parent;
+            }
+            csName = RunGo.name.Trim();
+            selectGo = RunGo.gameObject;
+        }
+        else
+        {
+            var runGo = go.transform;
+            while (runGo != null && runGo.GetComponent("UIPanelBase") == null)
+            {
+                runGo = runGo.transform.parent;
+            }
+            if (runGo == null) return;
+
+            selectGo = runGo.gameObject;
+            csName = runGo.GetComponent("UIPanelBase").GetType().Name;
+           
+           
+        }
+       
+        var guids = AssetDatabase.FindAssets($"t:Script {csName}", new string[] 
+        {
+            "Assets/hot_fix","Assets/client-code"
+        });
+        
+        var listPath = guids.Select((x) => AssetDatabase.GUIDToAssetPath(x)).Where((x)=>x.EndsWith(csName+".cs")).ToList<string>();
+        string targetGenCsFile = "";
+        string targetInterfaceCsFile = "";
+       
+        foreach (var item in listPath)
+        {
+            if (!item.Contains("generate"))
+            {
+                targetInterfaceCsFile = item;
+            }
+            else
+            {
+                targetGenCsFile = item;
+                
+            }
+        }
+        if(string.IsNullOrEmpty(targetGenCsFile))
+        {
+            Debug.LogError("未找到类"+ targetGenCsFile);
+            return;
+        }
+        var finalCSPath = targetInterfaceCsFile;
+        int codeNum = FindLineNumber(targetInterfaceCsFile, varName);
+        if(codeNum < 0)
+        {
+            codeNum = FindLineNumber(targetGenCsFile, varName);
+            finalCSPath = targetGenCsFile;
+        }
+        if (codeNum < 0)
+        {
+            Debug.Log("AssetDatabase.FindAssets耗时分析begin : " + Time.realtimeSinceStartup);
+            guids = AssetDatabase.FindAssets($"t:Script", new string[]
+            {
+                "Assets/hot_fix","Assets/client-code"
+            });
+            
+
+            listPath = guids.Select((x) => AssetDatabase.GUIDToAssetPath(x)).ToList<string>();
+        
+            Debug.Log("AssetDatabase.FindAssets耗时分析end : " + Time.realtimeSinceStartup);
+            Debug.Log("遍历所有cs脚本耗时begin : " + Time.realtimeSinceStartup);
+            var coms = Selection.activeGameObject.GetComponentsInParent<Component>(true);
+
+            for (int i = 0; i < coms.Length && codeNum < 0; i++)
+            {
+                var has = listPath.Find((xx) => xx.EndsWith(coms[i].GetType().Name + ".cs"));
+                if (!string.IsNullOrEmpty(has))
+                {
+                    finalCSPath = has;
+                    codeNum = FindLineNumber(has, varName);
+                }
+            }
+            Debug.Log("遍历所有cs脚本耗时end : " + Time.realtimeSinceStartup);
+        }
+
+        if (codeNum < 0)
+        {
+            Debug.LogError(finalCSPath + "未找到定义" + varName);
+            return;
+        }
+        if (File.Exists(finalCSPath))
+        {
+            UnityEditorInternal.InternalEditorUtility.OpenFileAtLineExternal(finalCSPath, codeNum);
+        }
+        else
+        {
+            Debug.LogError("文件不存在" + finalCSPath);
+        }
+        
+        int FindLineNumber(string filePath, string variableName)
+        {
+            string[] lines = System.IO.File.ReadAllLines(filePath);
+            // 先精准匹配
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (Regex.IsMatch(lines[i], $@"/b{Regex.Escape(variableName)}/b"))
+                {
+                    return i + 1;
+                }
+            }
+            //然后模糊匹配
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (lines[i].Contains(variableName))
+                {
+                    return i + 1;
+                }
+            }
+            return -1;
+        }
+    }
 
 
 

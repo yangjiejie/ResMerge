@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
-using AdjustSdk;
-using Cysharp.Threading.Tasks.Triggers;
+
+
 using UnityEditor;
 
 using UnityEngine;
@@ -14,6 +15,9 @@ public class FindRepeatRes : EditorWindow
 {
     private string inputWindowName;
     private int inputWindowName_hashCode;
+
+    public List<string> missingPrefab;
+    public static FindRepeatRes instance;
 
     private string guidStr;
     private string guidToAssetPath = "路径：";
@@ -25,7 +29,7 @@ public class FindRepeatRes : EditorWindow
     {
         public string md5Code;
         public List<SubResInfo> subInfos = new List<SubResInfo>();
-        public List<ComboMainResInfo> mainResList = new();
+        public List<MergedMainResInfo> mainResList = new();
     }
 
     public class SubResInfo
@@ -35,6 +39,11 @@ public class FindRepeatRes : EditorWindow
         public string resPath;
         public string md5Code;
         public string uuid;
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="pathName == unity相对资源路径 "></param>
+        /// <returns></returns>
         public SubResInfo Init(string pathName)
         {
             this.resName = Path.GetFileNameWithoutExtension(pathName);
@@ -61,7 +70,7 @@ public class FindRepeatRes : EditorWindow
     /// <summary>
     /// 某些资源同属于一个ab包。比如同在一个功能目录下 比如GameFruitUI/prefab 
     /// </summary>
-    public class ComboMainResInfo
+    public class MergedMainResInfo
     {
         public List<MainResInfo> editorResInfos = null;
     }
@@ -103,11 +112,11 @@ public class FindRepeatRes : EditorWindow
 
     public static Dictionary<string, List<MainResInfo>> likeSpriteResDepandence = new Dictionary<string, List<MainResInfo>>();
 
-    public static Dictionary<string, List<ComboMainResInfo>> spriteBeDepandence = new Dictionary<string, List<ComboMainResInfo>>();
+    public static Dictionary<string, List<MergedMainResInfo>> spriteBeDepandence = new Dictionary<string, List<MergedMainResInfo>>();
 
-    public static Dictionary<SubResInfo, bool> mergeedSpriteBeDepandence = new();
+    public static Dictionary<SubResInfo, List<SubResInfo>> mergeedSpriteBeDepandence = new();
 
-    public static Dictionary<string, List<ComboMainResInfo>> needDelTextureInfos = new Dictionary<string, List<ComboMainResInfo>>();
+    public static Dictionary<string, List<MergedMainResInfo>> needDelTextureInfos = new Dictionary<string, List<MergedMainResInfo>>();
 
 
     public static string CommonImage = "Assets/Art/gameCommon/image";
@@ -121,7 +130,7 @@ public class FindRepeatRes : EditorWindow
   
     public void OnDestroy()
     {
-       
+        instance = null;
         closeAction?.Invoke();
         closeAction = null;
     }
@@ -205,27 +214,9 @@ public class FindRepeatRes : EditorWindow
             dependenciesMap.Clear();
             if (checkFolders == null || checkFolders.Count == 0) return;
             List<string> paths = new();
-            foreach (var item in checkFolders)
-            {
-                var path = AssetDatabase.GetAssetPath(item);
-                if ( Regex.IsMatch(path, @"/icon/"))
-                {
-                    //Debug.LogError("目录不正确不能含有icon");
-                    continue;
-                }
-                if (File.Exists(path))
-                {
-                    path = System.IO.Path.GetDirectoryName(path);
-                }
-                var folders = Directory.GetDirectories(path);
-                var result = folders.FirstOrDefault((xx) => Regex.IsMatch(xx, "prefab"));
-                if (string.IsNullOrEmpty(result))
-                {
-                    continue;
-                }
-                if (paths.Count == 0 || !paths.Contains(path))
-                    paths.Add(path);
-            }
+
+            checkFolders.ForEach((xx) => paths.Add(AssetDatabase.GetAssetPath(xx)));
+            
 
             allAssetPaths = AssetDatabase.FindAssets("t:prefab t:Material", new string[] {"Assets/" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
 
@@ -309,7 +300,7 @@ public class FindRepeatRes : EditorWindow
                 // 删除字体及其依赖资源
                 foreach (string dependency in dependencies)
                 {
-                    if (!dependency.EndsWith(".prefab"))
+                    if (!dependency.EndsWith(".prefab") && !dependency.EndsWith(".ttf"))
                     {
                         var source = Path.Combine(System.Environment.CurrentDirectory, dependency);
                         if (!File.Exists(source))
@@ -348,9 +339,10 @@ public class FindRepeatRes : EditorWindow
         }
         GUILayout.EndVertical();
     }
-    public List<string> missingPrefab;
+    
     public void OnGUI()
     {
+        if (instance == null) instance = this;
         GUILayout.BeginVertical();
         selectPanel = GUILayout.Toolbar(selectPanel, namesPanel);  //参数1整数 参数2字符串数组
         GUILayout.EndVertical();
@@ -420,7 +412,7 @@ public class FindRepeatRes : EditorWindow
                 foreach(var item  in selectFolderPaths)
                 {
                    
-                    var allFiles =  System.IO.Directory.GetFiles(CommonUtils.GetLinuxPath(System.Environment.CurrentDirectory + "/" + item), "*.*",SearchOption.AllDirectories);
+                    var allFiles =  System.IO.Directory.GetFiles(EasyUseEditorFuns.GetLinuxPath(System.Environment.CurrentDirectory + "/" + item), "*.*",SearchOption.AllDirectories);
                     allFiles = allFiles.Where((xx) => !xx.EndsWith(".meta") && (xx.EndsWith(".png") ||   xx.EndsWith(".jpg"))).ToArray();
 
                     foreach(var li in allFiles)
@@ -437,19 +429,9 @@ public class FindRepeatRes : EditorWindow
                     {
                         string pattern = @"[\u4e00-\u9fff]";
                         if(Regex.IsMatch(file,pattern))
-                        {
-                            var file1 =  file.Substring(file.IndexOf("Assets/"));
-                            var newFile = Regex.Replace(file, pattern, "");
-                            var file2 = newFile.Substring(file.IndexOf("Assets/"));
-                            var ss = file;
+                        {                          
                             var tt = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, file.Substring(file.IndexOf("Assets/")));
-
-
-                            EasyUseEditorFuns.UnitySaveCopyFile(file, tt, true);
-                            var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, file1 + ".path");
-                            // 用额外的txt文件记录该文件的路径 方便回退
-                            EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, file1);
-                            EditorLogWindow.WriteLog(file);
+                            EasyUseEditorFuns.UnitySaveCopyFile(file, tt, withPathMetaFile:true);
                         }
                        
                     }
@@ -457,14 +439,18 @@ public class FindRepeatRes : EditorWindow
 
                     foreach (var file in fileList)
                     {
-                        string pattern = @"[\u4e00-\u9fff]";
+                        string pattern = @"[\u4e00-\u9fff]+";
                         if (Regex.IsMatch(file, pattern))
                         {
                             var file1 = file.Substring(file.IndexOf("Assets/"));
-                            var newFile = Regex.Replace(file, pattern, "");
-                            var file2 = newFile.Substring(file.IndexOf("Assets/"));
+                            var folderName = System.IO.Path.GetDirectoryName(file1);
+                            folderName = EasyUseEditorFuns.GetLinuxPath(folderName);
+                            folderName = folderName.Substring(folderName.LastIndexOf("/")+1);
+                            folderName = folderName.Substring(folderName.LastIndexOf("/")+1);
+                            var newFile = Regex.Replace(file, pattern, folderName);
+                            var file2 = newFile.Substring(file.IndexOf("Assets/")); 
                             if (File.Exists(newFile))
-                            {
+                            {   
                                 Debug.LogError("需要清理资源" + newFile);
                                 AssetDatabase.DeleteAsset(newFile.Substring( newFile.IndexOf("Assets/")));
                             }
@@ -527,7 +513,7 @@ public class FindRepeatRes : EditorWindow
                 foreach (var item in allAssetPaths)
                 {
                     EditorUtility.DisplayProgressBar("遍历所有主体资源", string.Format("{0}/{1}", index, allAssetPaths.Count), 1.0f * index++ / allAssetPaths.Count);
-                    var fullPath = CommonUtils.GetLinuxPath(Path.Combine(System.Environment.CurrentDirectory, item));
+                    var fullPath = EasyUseEditorFuns.GetLinuxPath(Path.Combine(System.Environment.CurrentDirectory, item));
                     var allContent = File.ReadAllText(fullPath);
 
                     if(Regex.IsMatch(allContent,sourceUUid))
@@ -550,7 +536,12 @@ public class FindRepeatRes : EditorWindow
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
             }
+            if(GUILayout.Button("动态资源预览"))
+            {
+                IconViewerWindow.GetWindow<IconViewerWindow>().Show();
+            }
 
+            
 
 
             GUILayout.EndVertical();
@@ -595,14 +586,14 @@ public class FindRepeatRes : EditorWindow
             {
                 Debug.Log("Deleting unused asset: " + path);
 
-                var ss = Path.Combine(System.Environment.CurrentDirectory, path);
-                var tt = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, path);
-                EasyUseEditorFuns.UnitySaveCopyFile(ss, tt, true);
+                //var ss = Path.Combine(System.Environment.CurrentDirectory, path);
+                //var tt = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, path);
+                //EasyUseEditorFuns.UnitySaveCopyFile(ss, tt, true);
 
 
-                var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, path + ".path");
-                // 用额外的txt文件记录该文件的路径 方便回退
-                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, path);
+                //var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, path + ".path");
+                //// 用额外的txt文件记录该文件的路径 方便回退
+                //EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, path);
 
                 AssetDatabase.DeleteAsset(path);
             }
@@ -633,10 +624,7 @@ public class FindRepeatRes : EditorWindow
         foreach (string path in allAssetPaths)
         {
             // 加载资源
-            if(dependenciesMap.ContainsKey(path))
-            {
-                continue;
-            }
+           
             var dependencies = AssetDatabase.GetDependencies(path);
             if(!dependenciesMap.ContainsKey(path))
             {
@@ -831,6 +819,7 @@ public class FindRepeatRes : EditorWindow
 
     public static void CleanRepeatRes()
     {
+        SafeDeleteUnityResHook.forbidHook = true;
         allMainResList?.Clear();
         allSubInfoLists?.Clear();
         allCommonSubInfoList?.Clear();
@@ -844,8 +833,11 @@ public class FindRepeatRes : EditorWindow
         var checkFolderPath = GetSelectArtFolders();
         var allRes = AssetDatabase.FindAssets("t:prefab t:Material", checkFolderPath.ToArray());
         allRes = allRes.Select((xx) => xx = AssetDatabase.GUIDToAssetPath(xx)).ToArray<string>();
+       
+        allRes =  allRes.Where((xx) => !Regex.IsMatch(xx, @"/spine/")).ToArray<string>();
         int index = 0;
         EditorUtility.ClearProgressBar();
+        float beginTime = Time.realtimeSinceStartup;
         foreach (var pathName in allRes)
         {
             EditorUtility.DisplayProgressBar("阶段1收集主资源", string.Format("{0}/{1}", index, allRes.Length),1.0f* index++ / allRes.Length);
@@ -869,8 +861,10 @@ public class FindRepeatRes : EditorWindow
                 allMainResList.Add(info);
             }
         }
+       
         EditorUtility.ClearProgressBar();
-
+        
+        
         index = 0;
         foreach (var mainRes in allMainResList)
         {
@@ -879,7 +873,7 @@ public class FindRepeatRes : EditorWindow
             {
                 if (!likeSpriteResDepandence.ContainsKey(subRes.resPath))
                 {
-                    if(Regex.IsMatch(subRes.resPath,@"/icon/"))
+                    if(!Regex.IsMatch(subRes.resPath,@"/image/"))
                     {
                         continue;
                     }
@@ -901,7 +895,7 @@ public class FindRepeatRes : EditorWindow
             EditorUtility.DisplayProgressBar("阶段3子资源处理", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / likeSpriteResDepandence.Count);
             if (!spriteBeDepandence.ContainsKey(subRes.Key))
             {
-                spriteBeDepandence.Add(subRes.Key, new List<ComboMainResInfo>());
+                spriteBeDepandence.Add(subRes.Key, new List<MergedMainResInfo>());
             }
             Dictionary<string, List<MainResInfo>> map = new Dictionary<string, List<MainResInfo>>();
             foreach (var mainRes in subRes.Value)
@@ -916,7 +910,7 @@ public class FindRepeatRes : EditorWindow
             foreach (var item in map)
             {
                 //对于依赖的资源如果他们来自于相同的逻辑目录，也就是相同的ab包 需要合并在一起
-                var info = new ComboMainResInfo();
+                var info = new MergedMainResInfo();
                 info.editorResInfos = item.Value;
                 spriteBeDepandence[subRes.Key].Add(info);
             }
@@ -935,7 +929,8 @@ public class FindRepeatRes : EditorWindow
             var listCombo = item.Value;
             if (mergeedSpriteBeDepandence.Count == 0)
             {
-                mergeedSpriteBeDepandence.Add(findRst, true);
+                mergeedSpriteBeDepandence.Add(findRst, new List<SubResInfo>());
+                mergeedSpriteBeDepandence[findRst].Add(findRst);
             }
             else
             {
@@ -943,7 +938,8 @@ public class FindRepeatRes : EditorWindow
                 var mergedObj = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == findRst.md5Code);
                 if (mergedObj.Key == null)
                 {
-                    mergeedSpriteBeDepandence.Add(findRst, true);
+                    mergeedSpriteBeDepandence.Add(findRst, new List<SubResInfo>());
+                    mergeedSpriteBeDepandence[findRst].Add(findRst);
                 }
                 else
                 {
@@ -953,23 +949,40 @@ public class FindRepeatRes : EditorWindow
                         mergeedSpriteBeDepandence.Remove(mergedObj.Key);
                         var unNormalSprite = spriteBeDepandence.FirstOrDefault((yy) => yy.Key == mergedObj.Key.resPath);
                         needDelTextureInfos.Add(unNormalSprite.Key, unNormalSprite.Value);
-                        mergeedSpriteBeDepandence.Add(findRst, true);
+                        mergeedSpriteBeDepandence.Add(findRst, new List<SubResInfo>());
+                        mergeedSpriteBeDepandence[findRst].Add(findRst);
                     }
                     else
                     {
+                        mergedObj.Value.Add(findRst);
                         needDelTextureInfos.Add(item.Key, item.Value);
 
                     }
                 }
             }
         }
-        DoReplace();
+        try
+        {
+            DoReplace();
+        }
+        catch(Exception e)
+        {
+            Debug.LogError(e);
+        }
+       
+
+        SafeDeleteUnityResHook.forbidHook = false;
     }
     /// <summary>
     /// 执行资源的清理工作 
     /// </summary>
     static void DoReplace()
     {
+        if (File.Exists("D:/清理重复资源.txt"))
+        {
+            File.Delete("D:/清理重复资源.txt");
+        }
+
         //先copy到local版本
         int index = 0; 
         foreach (var item in needDelTextureInfos)
@@ -993,76 +1006,101 @@ public class FindRepeatRes : EditorWindow
         }
         index = 0;
         EditorUtility.ClearProgressBar();
+        
         AssetDatabase.Refresh(); // 刷新unity DB
+
+        //合并资源到Common
+        foreach (var item in needDelTextureInfos)
+        {
+            EditorUtility.DisplayProgressBar("阶段4.1和并资源到common", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / needDelTextureInfos.Count);
+            var needDelTextureRes = GetTextureInfo(item.Key);
+            if (needDelTextureRes == null) continue;
+
+            var hasMergedRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
+            var hasMergedResUUid = hasMergedRes.Key.uuid;
+            var commonRes = GetCommonRes(needDelTextureRes.md5Code);
+            if (commonRes != null) continue;
+            //将已经被设为合并的资源放到common中 ，这个资源被依赖的主资源不用更新 
+            var source = Path.Combine(System.Environment.CurrentDirectory, hasMergedRes.Key.resPath);
+            var fileName = Path.GetFileName(hasMergedRes.Key.resPath);
+            var targetCommonPath = Path.Combine(System.Environment.CurrentDirectory, CommonImage, fileName);
+            var sourceBackupPath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, hasMergedRes.Key.resPath);
+            EasyUseEditorFuns.UnitySaveCopyFile(source, sourceBackupPath, true, withPathMetaFile: true);
+            EasyUseEditorFuns.UnitySaveMoveFile(source, targetCommonPath, true);
+            //更新common缓存 
+            UpdateCommonRes(targetCommonPath);
+            ReFreshSubResInfoList(targetCommonPath);
+            //这里我们只有.path文件过去 没有实际的文件拷贝过去,目的就是为了做回滚
+            var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, fileName + ".path");
+            // 用额外的txt文件记录该文件的路径 方便回退
+            EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, targetCommonPath);
+            // end 
+            //很遗憾 merged容器中也会被删除 ，hasMergedRes 
+           // hasMergedRes.Key.DelFromDevice();
+            mergeedSpriteBeDepandence.Remove(hasMergedRes.Key);
+            var newCommonInfo = GetTextureInfo(EasyUseEditorFuns.GetUnityAssetPath(targetCommonPath));
+            if (!mergeedSpriteBeDepandence.ContainsKey(newCommonInfo))
+            {
+                mergeedSpriteBeDepandence.Add(newCommonInfo, new List<SubResInfo>());
+                mergeedSpriteBeDepandence[newCommonInfo].Add(newCommonInfo);
+            }
+        }
+        index = 0;
+        EditorUtility.ClearProgressBar();
         foreach (var item in needDelTextureInfos)
         {
             EditorUtility.DisplayProgressBar("阶段5替换资源", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / needDelTextureInfos.Count);
             var needDelTextureRes = GetTextureInfo(item.Key);
+            if(needDelTextureRes == null) continue;
 
-            var targetRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
+            var hasMergedRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
 
-            if (needDelTextureRes.resPath == targetRes.Key.resPath)
+            if (needDelTextureRes.resPath == hasMergedRes.Key.resPath)
             {
                 Debug.LogError("逻辑错误");
                 continue;
             }
 
-            var targetUUid = targetRes.Key.uuid;
+            var hasMergedResUUid = hasMergedRes.Key.uuid;
 
-            var commonRes = GetCommonRes(needDelTextureRes.md5Code);
-
-            if (commonRes == null)
-            {
-                //将已经被设为合并的资源放到common中 ，这个资源被依赖的主资源不用更新 
-                var source = Path.Combine(System.Environment.CurrentDirectory, targetRes.Key.resPath);
-                var fileName = Path.GetFileName(targetRes.Key.resPath);
-                var target = Path.Combine(System.Environment.CurrentDirectory, CommonImage, fileName);
-                EasyUseEditorFuns.UnitySaveCopyFile(source, target, true);
-
-                UpdateCommonRes(target);
-                //这里我们只有.path文件过去 没有实际的文件拷贝过去,目的就是为了做回滚
-                var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, targetRes.Key.resPath + ".path");
-                // 用额外的txt文件记录该文件的路径 方便回退
-                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, targetRes.Key.resPath);
-                // end 
-                targetRes.Key.DelFromDevice();
-
-            }
-            else
-            {
-                var commonBeDependance = spriteBeDepandence.FirstOrDefault((xx) => xx.Key == commonRes.resPath);
-                for (int i = 0; commonBeDependance.Key != null && i < commonBeDependance.Value.Count; i++)
-                {
-                    for (int j = 0; j < commonBeDependance.Value[i].editorResInfos.Count; j++)
-                    {
-                        EditorResReplaceByUuid.ReplaceUUID(commonBeDependance.Value[i].editorResInfos[j].resPath, commonRes.uuid, targetUUid);
-
-                    }
-                }
-            }
-
-
-
-
+            
             for (int i = 0; i < item.Value.Count; i++)
             {
                 for (int j = 0; j < item.Value[i].editorResInfos.Count; j++)
                 {
-                    EditorResReplaceByUuid.ReplaceUUID(item.Value[i].editorResInfos[j].resPath, needDelTextureRes.uuid, targetUUid);
+
+                  //  EditorResReplaceByUuid.ReplaceUUID(item.Value[i].editorResInfos[j].resPath, needDelTextureRes.uuid, hasMergedResUUid);
 
                 }
             }
-
-            needDelTextureRes.DelFromDevice(); // 从磁盘上删除 
+            StringBuilder sb = new();
+            sb.Append("当前正在处理第" + index + "个文件");
+            sb.Append(",文件名为" + needDelTextureRes.resPath);
+            File.AppendAllText("D:/清理重复资源.txt", sb.ToString());
+         //    needDelTextureRes.DelFromDevice(); // 从磁盘上删除 
 
             Debug.Log("需要删除" + item.Key);
         }
-
+        index = 0;
+        EditorUtility.ClearProgressBar();
+        AssetDatabase.SaveAssets();
         AssetDatabase.Refresh(); // 刷新unity DB
     }
 
     static SubResInfo GetTextureInfo(string assetPath)
     {
         return allSubInfoLists.Find((xx) => assetPath == xx.resPath);
+    }
+    static SubResInfo ReFreshSubResInfoList(string assetPath)
+    {
+        assetPath = EasyUseEditorFuns.GetUnityAssetPath(assetPath);
+        if (null == GetTextureInfo(assetPath))
+        {
+            var info = new SubResInfo();
+            info.Init(assetPath);
+            allSubInfoLists.Add(info);
+            return info;
+        }
+        return null;
     }
 }

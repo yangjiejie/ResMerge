@@ -21,6 +21,18 @@ public class SceneViewUI
         var oldColor = GUI.color;
         GUI.color = Color.black;
 
+        Rect sceneViewRect = SceneView.currentDrawingSceneView.position;
+
+        // 计算 Box 在右下角的位置
+        float boxX = sceneViewRect.width - 300;
+        float boxY = sceneViewRect.height  - 50;
+
+        // 创建一个 GUILayout 区域，将其放置在右下角
+        GUILayout.BeginArea(new Rect(boxX, boxY, 300, 100));
+        // 创建一个 GUILayout.Box
+        GUILayout.Box("按下F12直接跳转到选中gameObject对应的代码行");
+        GUILayout.EndArea();
+
         Vector3 bottomLeftWorld = sceneView.camera.ViewportToWorldPoint(new Vector3(0, 0, sceneView.camera.nearClipPlane));
         Vector2 bottomLeftScreen = HandleUtility.WorldToGUIPoint(bottomLeftWorld);
 

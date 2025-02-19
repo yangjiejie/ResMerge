@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using UnityEditor.Animations;
 using System.IO;
 
-using RTLTMPro;
-using static BalootPatternOption.Types;
+
+
 using System.Text.RegularExpressions;
 using UnityEngine.Windows;
-using AdjustSdk;
+
 
 
 public class RightBtnMenu
@@ -384,33 +384,6 @@ public class RightBtnMenu
         Debug.Log(outStr);
     }
 
-    [MenuItem("GameObject/右键菜单/文本清空优化", priority = 1)]
-    static void ClearTextContent()
-    {
-
-        UnityEngine.Object[] selectedObjs = Selection.GetFiltered(typeof(GameObject), SelectionMode.DeepAssets);
-        for (int i = 0; i < selectedObjs.Length; i++)
-        {
-            GameObject go = selectedObjs[i] as GameObject;
-            var texts = go.GetComponentsInChildren<Text>(true);
-            for (int j = 0; j < texts.Length; j++)
-            {
-                UnityUtil.SetText(texts[j].gameObject, "");
-                
-            }
-            var textMeshPro = go.GetComponentsInChildren<RTLTextMeshPro>(true);
-            for (int j = 0; j < textMeshPro.Length; j++)
-            {
-                UnityUtil.SetText(textMeshPro[j].gameObject, "");
-                
-            }
-            Debug.Log(string.Format("已清空预设{0}的文本内容", go.name));
-            EditorUtility.SetDirty(go);
-        }
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-        
-    }
 
     [MenuItem("GameObject/右键菜单/raycast优化", priority = 1)]
     static void ModifyUIImageAndTextRaycastAttribute()
@@ -458,6 +431,7 @@ public class RightBtnMenu
     [MenuItem("GameObject/拼ui", priority = -100)]
     static void CreateRowImage(MenuCommand cmd)
     {
+        var size = GameViewTools.GameViewSize(); // 屏幕大小  
         GameObject go = cmd.context as GameObject;
         var dirPath = EditorPrefs.GetString("ui_path", "");
 
@@ -483,6 +457,9 @@ public class RightBtnMenu
         origin.transform.SetParent(go.transform, false);
         var originRect = origin.AddComponent<RectTransform>();
         InitRectTransform(originRect);
+
+
+        
 
 
 
@@ -521,6 +498,12 @@ public class RightBtnMenu
         }
 
         childs.Clear();
+
+        var origin2 = GameObject.Instantiate(originRect, originRect.parent, false);
+        origin2.name = "origin2";
+        origin2.offsetMin = new Vector2(-size.x, 0);
+        origin2.offsetMax = new Vector2(-size.x, 0);
+        origin2.GetComponent<CanvasGroup>().alpha = 1.0f;
         var width = GameViewTools.devWidth;
         var height = GameViewTools.devHeight;
         width = GameViewTools.devWidth;
@@ -536,40 +519,67 @@ public class RightBtnMenu
         fs.Dispose();
         fs = null;
 
-       
+        
 
         Texture2D texture = new Texture2D(width, height);
         texture.LoadImage(bytes);
-        var xx = go.transform.Find("ViewTheImage");
-        GameObject rowObj = null;
-        if (xx != null)
-        {
-            rowObj = xx.gameObject;
-        }
+        InitViewImage("ViewTheImage", 0.4f);
        
-        RawImage row = null;
-        if (null == rowObj)
+        InitViewImage("ViewTheImage2", 1f,new Vector2(size.x, 0),new Vector2(size.x, 0));
+        void InitViewImage(string goName,float alpha,Vector2 offsetMin = default,Vector2 offsetMax = default)
         {
-            rowObj = new GameObject("ViewTheImage");
-            rowObj.transform.SetParent(go.transform, false);
-            row = rowObj.AddComponent<UnityEngine.UI.RawImage>();
-            
-        }
-        if (row == null)
-        {
-            row = rowObj.GetComponent<UnityEngine.UI.RawImage>();
-        }
-        row.color = new Color(row.color.r, row.color.g, row.color.b, 0.4f);
-        (row.transform as RectTransform).sizeDelta = new Vector2(width, height);
-        rowObj.transform.SetAsFirstSibling();
-        (rowObj.transform as RectTransform).anchoredPosition = Vector2.zero;
-        row.texture = texture;
-        if (!rowObj.activeSelf)
-        {
-            rowObj.SetActive(true);
-        }
-        
+            var xx = go.transform.Find(goName);
+            GameObject rowObj = null;
+            if (xx != null)
+            {
+                rowObj = xx.gameObject;
+            }
 
+            RawImage row = null;
+            if (null == rowObj)
+            {
+                rowObj = new GameObject(goName);
+                rowObj.transform.SetParent(go.transform, false);
+                row = rowObj.AddComponent<UnityEngine.UI.RawImage>();
+
+            }
+            if (row == null)
+            {
+                row = rowObj.GetComponent<UnityEngine.UI.RawImage>();
+            }
+            row.color = new Color(row.color.r, row.color.g, row.color.b, alpha);
+            (row.transform as RectTransform).sizeDelta = new Vector2(width, height);
+            rowObj.transform.SetAsFirstSibling();
+            (rowObj.transform as RectTransform).anchorMin = new Vector2(0, 0);
+            (rowObj.transform as RectTransform).anchorMax = new Vector2(1, 1);
+
+            
+            if(offsetMin != default)
+            {
+                (rowObj.transform as RectTransform).offsetMin = offsetMin;
+            }
+            else
+            {
+                (rowObj.transform as RectTransform).offsetMin = Vector2.zero;
+            }
+            if (offsetMax != default)
+            {
+                (rowObj.transform as RectTransform).offsetMax = offsetMax;
+            }
+            else
+            {
+                (rowObj.transform as RectTransform).offsetMax = Vector2.zero;
+            }
+            row.texture = texture;
+            if (!rowObj.activeSelf)
+            {
+                rowObj.SetActive(true);
+            }
+        }
+
+        
+        
+       
     }
     [MenuItem("CONTEXT/Transform/删除所有组件除了trans本身")]
     static void DeleteAllComButTransform(MenuCommand cmd)
