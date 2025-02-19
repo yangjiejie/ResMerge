@@ -46,6 +46,7 @@ public class FindRepeatRes : EditorWindow
         /// <returns></returns>
         public SubResInfo Init(string pathName)
         {
+            pathName = EasyUseEditorFuns.GetUnityAssetPath(pathName);
             this.resName = Path.GetFileNameWithoutExtension(pathName);
             this.resNameLittle = resName.ToLower();
             this.resPath = pathName;
