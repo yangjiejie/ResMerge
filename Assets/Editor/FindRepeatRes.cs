@@ -1068,9 +1068,10 @@ public class FindRepeatRes : EditorWindow
             commonIndex = commonIndex >= 0 ? commonIndex : 0;
             var resHelper = new ResMergeHelper();
             resHelper.replaceRes = subItem[commonIndex];
-            for (int j = 0; j < subItem.Count && j != commonIndex; j++)
+            for (int j = 0; j < subItem.Count; j++)
             {
-                resHelper.Add(subItem[j]);
+                if(j != commonIndex)
+                    resHelper.Add(subItem[j]);
             }
             resMergeHelperList.Add(resHelper);
         }
