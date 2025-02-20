@@ -880,7 +880,7 @@ public class FindRepeatRes : EditorWindow
         spriteBeDepandence?.Clear();
         likeSpriteResDepandence?.Clear();
         mergeedSpriteBeDepandence?.Clear();
-        needDelTextureInfos?.Clear();
+        resMergeHelperList?.Clear();
 
         CollectAllCommonRes();
 
@@ -1012,6 +1012,7 @@ public class FindRepeatRes : EditorWindow
         }
         catch(Exception e)
         {
+            EditorUtility.ClearProgressBar();
             Debug.LogError(e);
         }
        
