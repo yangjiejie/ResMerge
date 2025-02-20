@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor.SceneManagement;
 using System.Linq;
+using Codice.CM.Common.Tree.Partial;
 
 public class EasyUseEditorFuns
 {
@@ -56,7 +57,12 @@ public class EasyUseEditorFuns
     /// <returns></returns>
     public static string GetUnityAssetPath( string fullPath)
     {
-        return fullPath.Substring(fullPath.IndexOf("Assets/"));
+        var index = fullPath.IndexOf("Assets/");
+        if (index >= 0)
+        {
+            return fullPath.Substring(index);
+        }
+        return fullPath;
     }
 
     /// <summary>
