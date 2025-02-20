@@ -133,7 +133,7 @@ public class FindRepeatRes : EditorWindow
             var targetPath = Path.Combine(commonPath, fileName);
 
             // 用额外的txt文件记录该文件的路径 方便回退
-            EasyUseEditorFuns.WriteFileToTargetPath(Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, EasyUseEditorFuns.GetUnityAssetPath(commonPath) + ".path"), EasyUseEditorFuns.GetUnityAssetPath(targetPath));
+            EasyUseEditorFuns.WriteFileToTargetPath(Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, EasyUseEditorFuns.GetUnityAssetPath(targetPath) + ".path"), EasyUseEditorFuns.GetUnityAssetPath(targetPath));
 
             EasyUseEditorFuns.UnitySaveCopyFile(sourcePath,
                 Path.Combine(EasyUseEditorFuns.baseCustomTmpCache,EasyUseEditorFuns.GetUnityAssetPath(sourcePath)),
