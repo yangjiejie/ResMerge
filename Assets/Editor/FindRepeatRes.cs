@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Policy;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -107,6 +108,57 @@ public class FindRepeatRes : EditorWindow
         }
     }
 
+    public class ResMergeHelper
+    {
+        public List<SubResInfo> needDelResList; // 需要删除的资源
+        public SubResInfo replaceRes; // 替换的资源
+        
+        public void Add(SubResInfo info)
+        {
+            if (needDelResList == null) needDelResList = new();
+            needDelResList.Add(info);
+        }
+        public void TryMoveToCommon()
+        {
+            if (replaceRes == null) return;
+            if(InCommonRes(replaceRes))
+            {
+                return;
+            }
+            var basePath = Environment.CurrentDirectory;
+            var commonPath = Path.Combine(basePath, CommonImage);
+            var sourcePath = Path.Combine(basePath, replaceRes.resPath);
+            var fileName = Path.GetFileName(replaceRes.resPath);
+            var targetPath = Path.Combine(commonPath, fileName);
+            EasyUseEditorFuns.UnitySaveMoveFile(sourcePath, targetPath);
+        }
+
+        public void Replace()
+        {
+            TryMoveToCommon();
+            //执行删除 
+            foreach(var item in needDelResList)
+            {
+                item.DelFromDevice();
+            }
+            //执行替换 uuid
+            foreach (var item in needDelResList)
+            {
+                var mainResList = GetMergedMainResBySubRes(item.resPath);
+                for(int i = 0; i < mainResList.Count; i++)
+                {
+                    for(int j = 0; j < mainResList[i].editorResInfos.Count; j++)
+                    {
+                        EditorResReplaceByUuid.ReplaceUUID(mainResList[i].editorResInfos[j].resPath, item.uuid, replaceRes.uuid);
+                    }
+                    
+                }
+                
+            }
+        }
+    }
+
+
     public static List<MainResInfo> allMainResList = new List<MainResInfo>();
     public static List<SubResInfo> allSubInfoLists = new List<SubResInfo>();
     public static List<SubResInfo> allCommonSubInfoList = new();
@@ -117,7 +169,8 @@ public class FindRepeatRes : EditorWindow
 
     public static Dictionary<SubResInfo, List<SubResInfo>> mergeedSpriteBeDepandence = new();
 
-    public static Dictionary<string, List<MergedMainResInfo>> needDelTextureInfos = new Dictionary<string, List<MergedMainResInfo>>();
+    public static List<ResMergeHelper> resMergeHelperList = new();
+ 
 
 
     public static string CommonImage = "Assets/Art/gameCommon/image";
@@ -848,18 +901,24 @@ public class FindRepeatRes : EditorWindow
             var allDps = AssetDatabase.GetDependencies(pathName).Where((xx) => xx != pathName && !xx.EndsWith(".cs")).ToArray<string>();
             if (allDps.Length > 0)
             {
+                // 附加子资源依赖 
                 var childsInfo = info.AddDependency(allDps);
 
                 for (int i = 0; i < childsInfo.Count; i++)
                 {
-                    var findRst = allSubInfoLists.Find((xx) => xx.resPath == childsInfo[i].resPath);
-                    if (findRst == null)
-                    {
-                        allSubInfoLists.Add(childsInfo[i]);
-                    }
+                    buildSubResListLib(childsInfo[i]);
                 }
-
+                //构建主资源库 
                 allMainResList.Add(info);
+            }
+        }
+        ///构建子资源库 
+        void buildSubResListLib(SubResInfo subInfo)
+        {
+            var findRst = allSubInfoLists.Find((xx) => xx.resPath == subInfo.resPath);
+            if (findRst == null)
+            {
+                allSubInfoLists.Add(subInfo);
             }
         }
        
@@ -923,10 +982,8 @@ public class FindRepeatRes : EditorWindow
         // key是assetPath名 
         foreach (var item in spriteBeDepandence)
         {
-
             var findRst = GetTextureInfo(item.Key);
             if (findRst == null) Debug.LogError("运行错误！");
-
             var listCombo = item.Value;
             if (mergeedSpriteBeDepandence.Count == 0)
             {
@@ -942,26 +999,13 @@ public class FindRepeatRes : EditorWindow
                     mergeedSpriteBeDepandence.Add(findRst, new List<SubResInfo>());
                     mergeedSpriteBeDepandence[findRst].Add(findRst);
                 }
-                else
+                else // 有冲突 mergeedSpriteBeDepandence中已经有了该md5文件
                 {
-                    //如果findRst 包括了common，common是不能被剔除的 .
-                    if (findRst.resPath.Contains(CommonImage))
-                    {
-                        mergeedSpriteBeDepandence.Remove(mergedObj.Key);
-                        var unNormalSprite = spriteBeDepandence.FirstOrDefault((yy) => yy.Key == mergedObj.Key.resPath);
-                        needDelTextureInfos.Add(unNormalSprite.Key, unNormalSprite.Value);
-                        mergeedSpriteBeDepandence.Add(findRst, new List<SubResInfo>());
-                        mergeedSpriteBeDepandence[findRst].Add(findRst);
-                    }
-                    else
-                    {
-                        mergedObj.Value.Add(findRst);
-                        needDelTextureInfos.Add(item.Key, item.Value);
-
-                    }
+                    mergedObj.Value.Add(findRst);
                 }
             }
         }
+
         try
         {
             DoReplace();
@@ -975,6 +1019,24 @@ public class FindRepeatRes : EditorWindow
         
     }
     /// <summary>
+    /// 通过子资源获取所有的主资源 
+    /// </summary>
+    /// <param name="res"></param>
+    /// <returns></returns>
+    static List<MergedMainResInfo> GetMergedMainResBySubRes(string res)
+    {
+        if(spriteBeDepandence.TryGetValue(res,out List<MergedMainResInfo> xx))
+        {
+            return xx;
+        }
+        return null;
+    }
+
+    static bool InCommonRes(SubResInfo info)
+    {
+        return info.resPath.Contains(CommonImage);
+    }
+    /// <summary>
     /// 执行资源的清理工作 
     /// </summary>
     static void DoReplace()
@@ -986,104 +1048,41 @@ public class FindRepeatRes : EditorWindow
 
         //先copy到local版本
         int index = 0; 
-        foreach (var item in needDelTextureInfos)
+        foreach(var item in mergeedSpriteBeDepandence)
         {
-            EditorUtility.DisplayProgressBar("阶段4存档", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / needDelTextureInfos.Count);
-            // 先存档 本地版本管理 
-            for (int i = 0; i < item.Value.Count; i++)
+            var subItem = item.Value;
+            //合并的资源数量<= 1 说明没有2个相同的资源 这种直接跳过去
+            if(subItem.Count <= 1)
             {
-                for (int j = 0; j < item.Value[i].editorResInfos.Count; j++)
+                continue; 
+            }
+            var commonIndex = -1;
+            for(int i = 0; commonIndex == -1 && i < subItem.Count; i++)
+            {
+                if(InCommonRes(subItem[i]))
                 {
-                    var suorcePath = Path.Combine(System.Environment.CurrentDirectory, item.Value[i].editorResInfos[j].resPath);
-                    var targetPath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, item.Value[i].editorResInfos[j].resPath);
-                    EasyUseEditorFuns.UnitySaveCopyFile(suorcePath, targetPath, true);
-
-
-                    var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, item.Value[i].editorResInfos[j].resPath + ".path");
-                    // 用额外的txt文件记录该文件的路径 方便回退
-                    EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, item.Value[i].editorResInfos[j].resPath);
+                    commonIndex = i;
                 }
             }
+            commonIndex = commonIndex >= 0 ? commonIndex : 0;
+            var resHelper = new ResMergeHelper();
+            resHelper.replaceRes = subItem[commonIndex];
+            for (int j = 0; j < subItem.Count && j != commonIndex; j++)
+            {
+                resHelper.Add(subItem[j]);
+            }
+            resMergeHelperList.Add(resHelper);
         }
         index = 0;
         EditorUtility.ClearProgressBar();
         
-        AssetDatabase.Refresh(); // 刷新unity DB
-
-        //合并资源到Common
-        foreach (var item in needDelTextureInfos)
+        foreach (var item in resMergeHelperList)
         {
-            EditorUtility.DisplayProgressBar("阶段4.1和并资源到common", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / needDelTextureInfos.Count);
-            var needDelTextureRes = GetTextureInfo(item.Key);
-            if (needDelTextureRes == null) continue;
-
-            var hasMergedRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
-            var hasMergedResUUid = hasMergedRes.Key.uuid;
-            var commonRes = GetCommonRes(needDelTextureRes.md5Code);
-            if (commonRes != null) continue;
-            //将已经被设为合并的资源放到common中 ，这个资源被依赖的主资源不用更新 
-            var source = Path.Combine(System.Environment.CurrentDirectory, hasMergedRes.Key.resPath);
-            var fileName = Path.GetFileName(hasMergedRes.Key.resPath);
-            var targetCommonPath = Path.Combine(System.Environment.CurrentDirectory, CommonImage, fileName);
-            var sourceBackupPath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, hasMergedRes.Key.resPath);
-            EasyUseEditorFuns.UnitySaveCopyFile(source, sourceBackupPath, true, withPathMetaFile: true);
-            EasyUseEditorFuns.UnitySaveMoveFile(source, targetCommonPath, true);
-            //更新common缓存 
-            UpdateCommonRes(targetCommonPath);
-            ReFreshSubResInfoList(targetCommonPath);
-            //这里我们只有.path文件过去 没有实际的文件拷贝过去,目的就是为了做回滚
-            var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, fileName + ".path");
-            // 用额外的txt文件记录该文件的路径 方便回退
-            EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, targetCommonPath);
-            // end 
-           
-           
-            mergeedSpriteBeDepandence.Remove(hasMergedRes.Key);
-            var newCommonInfo = GetTextureInfo(EasyUseEditorFuns.GetUnityAssetPath(targetCommonPath));
-            if (!mergeedSpriteBeDepandence.ContainsKey(newCommonInfo))
-            {
-                mergeedSpriteBeDepandence.Add(newCommonInfo, new List<SubResInfo>());
-                mergeedSpriteBeDepandence[newCommonInfo].Add(newCommonInfo);
-            }
+            EditorUtility.DisplayProgressBar("阶段5删除多余资源并自动替换引用", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / resMergeHelperList.Count);
+            item.Replace();
         }
-        index = 0;
         EditorUtility.ClearProgressBar();
-        foreach (var item in needDelTextureInfos)
-        {
-            EditorUtility.DisplayProgressBar("阶段5替换资源", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / needDelTextureInfos.Count);
-            var needDelTextureRes = GetTextureInfo(item.Key);
-            if(needDelTextureRes == null) continue;
 
-            var hasMergedRes = mergeedSpriteBeDepandence.FirstOrDefault((xx) => xx.Key.md5Code == needDelTextureRes.md5Code);
-
-            if (needDelTextureRes.resPath == hasMergedRes.Key.resPath)
-            {
-                Debug.LogError("逻辑错误");
-                continue;
-            }
-
-            var hasMergedResUUid = hasMergedRes.Key.uuid;
-
-            
-            for (int i = 0; i < item.Value.Count; i++)
-            {
-                for (int j = 0; j < item.Value[i].editorResInfos.Count; j++)
-                {
-
-                    EditorResReplaceByUuid.ReplaceUUID(item.Value[i].editorResInfos[j].resPath, needDelTextureRes.uuid, hasMergedResUUid);
-
-                }
-            }
-            StringBuilder sb = new();
-            sb.Append("当前正在处理第" + index + "个文件");
-            sb.Append(",文件名为" + needDelTextureRes.resPath);
-            File.AppendAllText("D:/清理重复资源.txt", sb.ToString());
-             needDelTextureRes.DelFromDevice(); // 从磁盘上删除 
-
-            Debug.Log("需要删除" + item.Key);
-        }
-        index = 0;
-        EditorUtility.ClearProgressBar();
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh(); // 刷新unity DB
     }

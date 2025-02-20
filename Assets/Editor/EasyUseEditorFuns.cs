@@ -64,9 +64,9 @@ public class EasyUseEditorFuns
     /// </summary>
     /// <param name="source 绝对路径"></param>
     /// <param name="target 绝对路径"></param>
-    /// <param name="overrite"></param>
-    /// <param name="withPathMetaFile 若为true则会自动写入.path文件记录之前所在的文件夹"></param> 
-    public static void UnitySaveMoveFile(string source, string target, bool overrite = true, bool withMetaFile = true, bool withPathMetaFile = false)
+    /// <param name="withMetaFile 是否将meta文件一并move"></param>
+
+    public static void UnitySaveMoveFile(string source, string target, bool withMetaFile = true)
     {
         try
         {
@@ -98,13 +98,7 @@ public class EasyUseEditorFuns
                 }
                 System.IO.File.Move(metaSourceFile, metaTargeFile);
             }
-            if (withPathMetaFile)
-            {
-                var metaFilePath2 = target + ".path";
-                var targetUnityAssetPathName = target.Substring(target.IndexOf("Assets/"));
-                // 用额外的txt文件记录该文件的路径 方便回退
-                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath2, targetUnityAssetPathName);
-            }
+            
         }
         catch (Exception e)
         {
@@ -173,8 +167,9 @@ public class EasyUseEditorFuns
             if (!isSaveToLocal)
                 Debug.Log($"{resPath}已删除且不存档");
 
-            File.Delete(resPath);
-            File.Delete(resPath + ".meta"); 
+            AssetDatabase.DeleteAsset(resPath);
+            AssetDatabase.DeleteAsset(resPath + ".meta");
+        
         }
         catch (System.Exception e)
         {
