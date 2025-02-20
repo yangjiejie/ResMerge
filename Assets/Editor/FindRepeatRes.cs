@@ -125,21 +125,55 @@ public class FindRepeatRes : EditorWindow
             {
                 return;
             }
+            
             var basePath = Environment.CurrentDirectory;
             var commonPath = Path.Combine(basePath, CommonImage);
             var sourcePath = Path.Combine(basePath, replaceRes.resPath);
             var fileName = Path.GetFileName(replaceRes.resPath);
             var targetPath = Path.Combine(commonPath, fileName);
+
+            // 用额外的txt文件记录该文件的路径 方便回退
+            EasyUseEditorFuns.WriteFileToTargetPath(Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, replaceRes.resPath + ".path"), EasyUseEditorFuns.GetUnityAssetPath(targetPath));
             EasyUseEditorFuns.UnitySaveMoveFile(sourcePath, targetPath);
+            
         }
 
         public void Replace()
         {
             TryMoveToCommon();
+            var sourceBasePath = System.Environment.CurrentDirectory;
+            var targetBasePath = EasyUseEditorFuns.baseCustomTmpCache;
+            //执行删除前先备份 
+
+            foreach (var item in needDelResList)
+            {
+                EasyUseEditorFuns.UnitySaveCopyFile(
+                             Path.Combine(sourceBasePath, item.resPath),
+                             Path.Combine(targetBasePath, item.resPath),
+                             withPathMetaFile: true);
+            }
             //执行删除 
-            foreach(var item in needDelResList)
+            foreach (var item in needDelResList)
             {
                 item.DelFromDevice();
+            }
+            // 先备份预设 
+          
+            foreach (var item in needDelResList)
+            {
+                var mainResList = GetMergedMainResBySubRes(item.resPath);
+                for (int i = 0; i < mainResList.Count; i++)
+                {
+                    for (int j = 0; j < mainResList[i].editorResInfos.Count; j++)
+                    {
+                        EasyUseEditorFuns.UnitySaveCopyFile(
+                            Path.Combine(sourceBasePath, mainResList[i].editorResInfos[j].resPath),
+                            Path.Combine(targetBasePath, mainResList[i].editorResInfos[j].resPath), 
+                            withPathMetaFile: true);
+                    }
+
+                }
+
             }
             //执行替换 uuid
             foreach (var item in needDelResList)
