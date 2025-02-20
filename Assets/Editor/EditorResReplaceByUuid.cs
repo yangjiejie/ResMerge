@@ -21,7 +21,7 @@ public class EditorResReplaceByUuid
         //备份 
         var source = Path.Combine(System.Environment.CurrentDirectory, resPath);
         var target = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, resPath);
-        EasyUseEditorFuns.UnitySaveCopyFile(source, target, withPathMetaFile: true);
+        EasyUseEditorFuns.UnitySaveCopyFile(source, target, withPathMetaFile: true,isShowLog:false);
        
         if (resPath.EndsWith(".prefab") || resPath.EndsWith(".mat"))
         {

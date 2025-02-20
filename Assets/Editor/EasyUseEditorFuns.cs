@@ -122,7 +122,7 @@ public class EasyUseEditorFuns
     /// <param name="target 绝对路径"></param>
     /// <param name="overrite"></param>
     /// <param name="withPathMetaFile 若为true则会自动写入.path文件记录之前所在的文件夹"></param> 
-    public static void UnitySaveCopyFile(string source, string target, bool overrite = true,bool withMetaFile = true,bool withPathMetaFile = false)
+    public static void UnitySaveCopyFile(string source, string target, bool overrite = true,bool withMetaFile = true,bool withPathMetaFile = false,bool isShowLog = true)
     {
         try
         {
@@ -151,7 +151,7 @@ public class EasyUseEditorFuns
                 var metaFilePath2 = target + ".path";
                 var targetUnityAssetPathName = target.Substring(target.IndexOf("Assets/"));
                 // 用额外的txt文件记录该文件的路径 方便回退
-                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath2, targetUnityAssetPathName);
+                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath2, targetUnityAssetPathName, isShowLog);
             }
         }
         catch(Exception e)
@@ -309,7 +309,7 @@ public class EasyUseEditorFuns
     /// </summary>
     /// <param name="filePath 全路径"></param>
     /// <param name="contents unity资源路径"></param>
-    public static void WriteFileToTargetPath(string filePath, string contents)
+    public static void WriteFileToTargetPath(string filePath, string contents,bool isShowLog  = true)
     {
         contents = GetUnityAssetPath(contents);
         filePath = Path.GetFullPath(filePath);
@@ -322,8 +322,8 @@ public class EasyUseEditorFuns
         var writeFilePath = EasyUseEditorFuns.GetLinuxPath(baseCustomTmpCache);
         filePath = filePath.Replace(baseCustomTmpCache + "/", "");
 
-
-        EditorLogWindow.WriteLog(filePath.Replace(".path", ""));
+        if(isShowLog)
+            EditorLogWindow.WriteLog(filePath.Replace(".path", ""));
     }
 
     public static int CreateDir(string path)

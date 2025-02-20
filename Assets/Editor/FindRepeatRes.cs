@@ -163,7 +163,7 @@ public class FindRepeatRes : EditorWindow
                         EasyUseEditorFuns.UnitySaveCopyFile(
                             Path.Combine(sourceBasePath, mainResList[i].editorResInfos[j].resPath),
                             Path.Combine(targetBasePath, mainResList[i].editorResInfos[j].resPath),
-                            withPathMetaFile: true);
+                            withPathMetaFile: true,isShowLog:false);
                     }
                 }
             }
