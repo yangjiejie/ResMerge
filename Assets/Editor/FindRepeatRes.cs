@@ -811,7 +811,6 @@ public class FindRepeatRes : EditorWindow
                 if(File.Exists(targetFilePath))
                 {
                     AssetDatabase.DeleteAsset(targetFilePath);
-                    
                 }
                 EasyUseEditorFuns.UnitySaveCopyFile(reallyFilePath, targetFilePath);
             }
