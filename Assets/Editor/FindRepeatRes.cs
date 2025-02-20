@@ -151,6 +151,24 @@ public class FindRepeatRes : EditorWindow
             var targetBasePath = EasyUseEditorFuns.baseCustomTmpCache;
             //执行删除前先备份 
 
+            // 先备份预设 
+
+            foreach (var item in needDelResList)
+            {
+                var mainResList = GetMergedMainResBySubRes(item.resPath);
+                for (int i = 0; i < mainResList.Count; i++)
+                {
+                    for (int j = 0; j < mainResList[i].editorResInfos.Count; j++)
+                    {
+                        EasyUseEditorFuns.UnitySaveCopyFile(
+                            Path.Combine(sourceBasePath, mainResList[i].editorResInfos[j].resPath),
+                            Path.Combine(targetBasePath, mainResList[i].editorResInfos[j].resPath),
+                            withPathMetaFile: true);
+                    }
+                }
+            }
+            AssetDatabase.Refresh();
+
             foreach (var item in needDelResList)
             {
                 EasyUseEditorFuns.UnitySaveCopyFile(
@@ -163,8 +181,9 @@ public class FindRepeatRes : EditorWindow
             {
                 item.DelFromDevice();
             }
-            // 先备份预设 
-          
+            AssetDatabase.Refresh();
+
+            //执行替换 uuid
             foreach (var item in needDelResList)
             {
                 var mainResList = GetMergedMainResBySubRes(item.resPath);
@@ -172,27 +191,13 @@ public class FindRepeatRes : EditorWindow
                 {
                     for (int j = 0; j < mainResList[i].editorResInfos.Count; j++)
                     {
-                        EasyUseEditorFuns.UnitySaveCopyFile(
-                            Path.Combine(sourceBasePath, mainResList[i].editorResInfos[j].resPath),
-                            Path.Combine(targetBasePath, mainResList[i].editorResInfos[j].resPath), 
-                            withPathMetaFile: true);
-                    }
-                }
-            }
-            //执行替换 uuid
-            foreach (var item in needDelResList)
-            {
-                var mainResList = GetMergedMainResBySubRes(item.resPath);
-                for(int i = 0; i < mainResList.Count; i++)
-                {
-                    for(int j = 0; j < mainResList[i].editorResInfos.Count; j++)
-                    {
                         EditorResReplaceByUuid.ReplaceUUID(mainResList[i].editorResInfos[j].resPath, item.uuid, replaceRes.uuid);
                     }
-                    
+
                 }
-                
+
             }
+            AssetDatabase.Refresh();
         }
     }
 
@@ -301,7 +306,7 @@ public class FindRepeatRes : EditorWindow
         GUILayout.BeginVertical();
         if (GUILayout.Button("1清理无任何引用关联的资源", GUILayout.Height(50)))
         {
-            
+           
             allAssetPaths.Clear();
             dependenciesMap.Clear();
             if (checkFolders == null || checkFolders.Count == 0) return;
@@ -313,18 +318,23 @@ public class FindRepeatRes : EditorWindow
             allAssetPaths = AssetDatabase.FindAssets("t:prefab t:Material", new string[] {"Assets/" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
 
             ClearUnUsedTextures(paths);
+
+            
         }
         GUILayout.Space(10);
         if (GUILayout.Button("2清理重复资源", GUILayout.Height(50)))
         {
-            
+            SafeDeleteUnityResHook.forbidHook = true;
             CleanRepeatRes();
+            SafeDeleteUnityResHook.forbidHook = false;
         }
         GUILayout.Space(10);
         if (GUILayout.Button("3回滚清理的资源", GUILayout.Height(50)))
         {
+            SafeDeleteUnityResHook.forbidHook = true;
             EditorLogWindow.ClearLog();
             ReverseLocalSvn();
+            SafeDeleteUnityResHook.forbidHook = false;
 
         }
         GUILayout.Space(10);
@@ -798,6 +808,11 @@ public class FindRepeatRes : EditorWindow
             var targetFilePath = Path.Combine(System.Environment.CurrentDirectory, resPath);
             if (File.Exists(reallyFilePath))
             {
+                if(File.Exists(targetFilePath))
+                {
+                    AssetDatabase.DeleteAsset(targetFilePath);
+                    
+                }
                 EasyUseEditorFuns.UnitySaveCopyFile(reallyFilePath, targetFilePath);
             }
             else
