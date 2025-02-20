@@ -133,7 +133,13 @@ public class FindRepeatRes : EditorWindow
             var targetPath = Path.Combine(commonPath, fileName);
 
             // 用额外的txt文件记录该文件的路径 方便回退
-            EasyUseEditorFuns.WriteFileToTargetPath(Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, replaceRes.resPath + ".path"), EasyUseEditorFuns.GetUnityAssetPath(targetPath));
+            EasyUseEditorFuns.WriteFileToTargetPath(Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, EasyUseEditorFuns.GetUnityAssetPath(commonPath) + ".path"), EasyUseEditorFuns.GetUnityAssetPath(targetPath));
+
+            EasyUseEditorFuns.UnitySaveCopyFile(sourcePath,
+                Path.Combine(EasyUseEditorFuns.baseCustomTmpCache,EasyUseEditorFuns.GetUnityAssetPath(sourcePath)),
+                withPathMetaFile:true
+            );
+
             EasyUseEditorFuns.UnitySaveMoveFile(sourcePath, targetPath);
             
         }
@@ -171,9 +177,7 @@ public class FindRepeatRes : EditorWindow
                             Path.Combine(targetBasePath, mainResList[i].editorResInfos[j].resPath), 
                             withPathMetaFile: true);
                     }
-
                 }
-
             }
             //执行替换 uuid
             foreach (var item in needDelResList)

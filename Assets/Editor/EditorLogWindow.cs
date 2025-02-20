@@ -27,7 +27,10 @@ public class EditorLogWindow : EditorWindow
                 return;
             }
             var realPath = str.Substring(index >=0 ? index : 0);
-            
+            if(!File.Exists(realPath))
+            {
+                return;
+            }
             FileInfo fileInfo = new FileInfo(System.Environment.CurrentDirectory +"/" +realPath);
             float singleSize = fileInfo.Length / (1024.0f );
             totalResLength += singleSize;
