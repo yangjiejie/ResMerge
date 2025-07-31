@@ -13,6 +13,10 @@ using System.Security.Cryptography;
 
 
 using UnityEditor.SceneManagement;
+using UnityEngine.U2D;
+
+
+
 
 
 
@@ -22,12 +26,13 @@ public static class EasyUseEditorTool  // 简称euetool
 
     static Component[] copiedComponents;
     private static List<string> matchFiles = new List<string>();
-    private static List<string> findRstList = new();
+    private static List<string> findRstList = new List<string>();
     private static string[] sertchPaths = new string[] { Application.dataPath };	//搜索路径;
 
     public static string[] matchExtensions = new string[] { ".prefab", ".mat" }; //需要进行匹配的格式
 
-
+    public static string hotFixAssemblyFolder = "Assets/hot_fix"; // 项目c#热更目录 
+    public static string UIBaseClass = "UIPanelBase"; // ui的基础类 
 
     [MenuItem("GameObject/右键菜单/结点|预设存档", priority = -1)]
     static void SavePrefabNode()
@@ -47,7 +52,36 @@ public static class EasyUseEditorTool  // 简称euetool
 
     }
 
-    [MenuItem("GameObject/右键菜单/拷贝顶层gameObject #%d", priority = -2)]
+    //[MenuItem("GameObject/右键菜单/ui收集 _F3", priority = -3)]
+    //static void UICollect()
+    //{
+    //    if (EditorWindow.HasOpenInstances<UICollectTool>())
+    //    {
+    //        var win = EditorWindow.GetWindow<UICollectTool>();
+    //        win.Close(); // 已打开 -> 关闭
+    //    }
+    //    else
+    //    {
+    //        EditorWindow.GetWindow<UICollectTool>("ui收集"); // 未打开 -> 打开
+    //    }
+    //}
+
+    //[MenuItem("GameObject/右键菜单/ui工具箱 _F4", priority = -2)]
+    //static void UIToolBox()
+    //{
+    //    if (EditorWindow.HasOpenInstances<ToolboxWindow>())
+    //    {
+    //        var win = EditorWindow.GetWindow<ToolboxWindow>();
+    //        win.Close(); // 已打开 -> 关闭
+    //    }
+    //    else
+    //    {
+    //        EditorWindow.GetWindow<ToolboxWindow>("工具箱");
+    //    }
+    //}
+
+
+    [MenuItem("GameObject/右键菜单/拷贝顶层gameObject #%d", priority = -1)]
     static void CopyTopGameObject()
     {
         GameObject selected = Selection.activeGameObject;
@@ -431,13 +465,57 @@ public static class EasyUseEditorTool  // 简称euetool
                 Debug.Log("<color=#006400>查找结束" + Selection.activeObject.name + "</color>");
         }
     }
-
+    [MenuItem("Tools/代码行数")]
+    public static void CalcCodeLine()
+    {
+        string[] fileName = System.IO.Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories);
+        int totalLine = 0;
+        foreach (var item in fileName)
+        {
+            int nowLine = 0;
+            StreamReader sr = new StreamReader(item);
+            while (sr.ReadLine() != null)
+            {
+                nowLine++;
+            }
+            totalLine += nowLine;
+        }
+        Debug.Log($"代码总行数: {totalLine}=> 代码文件数{fileName.Length}");
+    }
 
     [MenuItem("Assets/右键工具/选中物体被引用查找", false, 0)]
     static private void FindRefByGUIDAvatars()
     {
         FindRefByGUIDRaw(new string[] { Application.dataPath , });
     }
+    [MenuItem("Assets/右键工具/修复字体丢失的问题", false, 0)]
+    static private void FixFontReferenceMiss()
+    {
+        var map = new Dictionary<string, string>()
+        {
+
+            {"71c1514a6bd24e1e882cebbe1904ce04" ,"7e4cf52634f79c74a8bec98fc3af6ec8" }, 
+        };
+        EditorApplication.ExecuteMenuItem("Assets/Copy Path");
+        var buffer = EditorGUIUtility.systemCopyBuffer;
+        var full = buffer.ToFullPath();
+
+        var content = File.ReadAllText(full);
+
+        foreach (var item in map)
+        {
+            content = Regex.Replace(content, item.Key, item.Value);
+        }
+
+        File.WriteAllText(full, content);
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
+
+
+    
+    
 
     [MenuItem("Assets/右键工具/跳转到c#对应的行 _F12", false, 0)]
     static private void GotoCSharpCodeLine()
@@ -445,7 +523,7 @@ public static class EasyUseEditorTool  // 简称euetool
         var go = Selection.activeGameObject;
         if (go == null) return;
         string varName = "";
-        //匹配  结点名@类型名 中的 结点名@ 
+        //匹配  结点名@类型名 中的 结点名@  因为我们ui的结点命名存在 变量名@类型名的设定 方便ui代码生成
         if(Regex.Match(go.transform.name, @"^(.*?)@").Success)
         {
             varName = Regex.Match(go.name, @"^(.*?)@").Groups[1].Value;
@@ -470,44 +548,71 @@ public static class EasyUseEditorTool  // 简称euetool
         else
         {
             var runGo = go.transform;
-            while (runGo != null && runGo.GetComponent("UIPanelBase") == null)
+            while (runGo != null && runGo.GetComponent(UIBaseClass) == null)
             {
                 runGo = runGo.transform.parent;
             }
             if (runGo == null) return;
 
             selectGo = runGo.gameObject;
-            csName = runGo.GetComponent("UIPanelBase").GetType().Name;
+            csName = runGo.GetComponent(UIBaseClass).GetType().Name;
            
            
         }
        
         var guids = AssetDatabase.FindAssets($"t:Script {csName}", new string[] 
         {
-            "Assets/hot_fix","Assets/client-code"
+            hotFixAssemblyFolder
         });
         
         var listPath = guids.Select((x) => AssetDatabase.GUIDToAssetPath(x)).Where((x)=>x.EndsWith(csName+".cs")).ToList<string>();
         string targetGenCsFile = "";
         string targetInterfaceCsFile = "";
-       
-        foreach (var item in listPath)
+
+        if (listPath.Count > 0)
         {
-            if (!item.Contains("generate"))
+            targetInterfaceCsFile = listPath[0];
+            var tmpCsName = System.IO.Path.GetFileName(targetInterfaceCsFile);
+            if(tmpCsName.StartsWith("GenCode_"))
             {
-                targetInterfaceCsFile = item;
+                targetGenCsFile = targetInterfaceCsFile;
+                targetInterfaceCsFile = targetGenCsFile.Replace("GenCode_", "");
             }
             else
             {
-                targetGenCsFile = item;
-                
+                var folderName = Path.GetDirectoryName(targetInterfaceCsFile);
+                targetGenCsFile = Path.Combine(folderName, "GenCode_" + tmpCsName);
+            }
+
+            var localGenCSFilePath = targetGenCsFile; 
+            if (!File.Exists(localGenCSFilePath))
+            {
+                targetGenCsFile = "";
             }
         }
-        if(string.IsNullOrEmpty(targetGenCsFile))
+
+        //兼容之前的那套逻辑 
+        if (string.IsNullOrEmpty(targetGenCsFile))
         {
-            Debug.LogError("未找到类"+ targetGenCsFile);
+            foreach (var item in listPath)
+            {
+                if (!item.Contains("generate"))
+                {
+                    targetInterfaceCsFile = item;
+                }
+                else
+                {
+                    targetGenCsFile = item;
+
+                }
+            }
+        }
+        if (string.IsNullOrEmpty(targetGenCsFile))
+        {
+            Debug.LogError("未找到类" + targetGenCsFile);
             return;
         }
+
         var finalCSPath = targetInterfaceCsFile;
         int codeNum = FindLineNumber(targetInterfaceCsFile, varName);
         if(codeNum < 0)
@@ -520,7 +625,7 @@ public static class EasyUseEditorTool  // 简称euetool
             Debug.Log("AssetDatabase.FindAssets耗时分析begin : " + Time.realtimeSinceStartup);
             guids = AssetDatabase.FindAssets($"t:Script", new string[]
             {
-                "Assets/hot_fix","Assets/client-code"
+                "Assets/hot_fix"
             });
             
 
@@ -773,6 +878,45 @@ public static class EasyUseEditorTool  // 简称euetool
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
     }
+
+    [MenuItem("Assets/资源安全回收", false, -10000)]
+    static private void SafeDeleteGameRes()
+    {
+        // 获取选中路径
+        var selectedGUIDs = Selection.assetGUIDs;
+        foreach (var guid in selectedGUIDs)
+        {
+            string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+            string fullPath = Path.Combine(Application.dataPath.Replace("Assets", ""), assetPath);
+
+            if (Directory.Exists(fullPath))
+            {
+                string[] allFiles = Directory.GetFiles(fullPath, "*.*", SearchOption.AllDirectories);
+
+               
+                foreach (string file in allFiles)
+                {
+                    if (file.EndsWith(".meta")) continue; // 跳过 .meta 文件
+
+                    var sourcePath = EasyUseEditorFuns.GetLinuxPath(file);
+                    var root = System.Environment.CurrentDirectory + "/mySvn/" + EasyUseEditorFuns.baseVersion;
+
+                    var targetPath = Path.Combine(root, sourcePath.ToUnityPath()).ToFullPath();
+
+                    EasyUseEditorFuns.UnitySaveMoveFile(sourcePath.ToFullPath(), targetPath, true, true);
+
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"不是文件夹：{assetPath}");
+            }
+        }
+        AssetDatabase.Refresh();
+        AssetDatabase.SaveAssets();
+
+    }
+   
 
     [MenuItem("Assets/右键工具/选中物体被引用查找2", false, 0)]
     static private void FindRefByGUID()

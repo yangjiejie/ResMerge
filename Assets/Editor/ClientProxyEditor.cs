@@ -25,21 +25,7 @@ public class ClientProxyEditor : Editor
 
     private void OnEnable()
     {
-        int nBit = 0;
-        if(defineArray.Length >= 32)
-        {
-            Debug.LogError("警告位已经不够用了");
-           
-        }
-        for(int i = 0; i < defineArray.Length; i++)
-        {
-            if (string.IsNullOrEmpty(defineArray[i])) continue;
-            if(EasyUseEditorFuns.HasDebugSymble(defineArray[i]))
-            {
-                nBit |=  GetBit(nBit, i);
-            }
-        }
-        (target as Main).DefineBit = nBit;
+        
         
         //c# read json 
 
@@ -116,25 +102,6 @@ public class ClientProxyEditor : Editor
             Application.OpenURL(System.Environment.CurrentDirectory +  "/Assets/Launcher/Main.cs");   
         }
 
-        Main global = target as Main;
-        SymbleDefine = EditorGUILayout.Foldout(SymbleDefine, new GUIContent("宏定义"));
-        if (SymbleDefine)
-        {
-            for(int i = 1; i < defineArray.Length; i++)
-            {
-                if (global && HasBit(global.DefineBit, i) && GUILayout.Button($"关闭宏{defineArray[i]}"))
-                {
-                    global.DefineBit = ClearBit(global.DefineBit, i);
-                    EasyUseEditorFuns.ChangeToXXDefine(false, defineArray[i]);
-                }
-                if (global && !HasBit(global.DefineBit, i) && GUILayout.Button($"开启宏{defineArray[i]}"))
-                {
-                    global.DefineBit = GetBit(global.DefineBit, i);
-                    EasyUseEditorFuns.ChangeToXXDefine(true, defineArray[i]);
-                }
-            }
-            
-            
-        }
+      
     }
 }

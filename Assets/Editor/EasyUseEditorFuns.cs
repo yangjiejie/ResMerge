@@ -10,18 +10,40 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor.SceneManagement;
 using System.Linq;
-using Codice.CM.Common.Tree.Partial;
+using JetBrains.Annotations;
+using GuideReplace;
 
-public class EasyUseEditorFuns
+
+
+public static class EasyUseEditorFuns
 {
-    
 
+    #region 业务代码 
+    public enum UIType
+    {
+
+        StartRoot = 1,
+        NormalRoot,
+        SubNormalRoot,
+        FixedRoot,
+        PopupRoot,
+        PeakRoot,
+        ChatRoot,
+        ChatRedPack,
+        SystemRoot,
+    }
+    #endregion
+
+
+    private static Dictionary<string, List<string>> _index;
 
     public static string _baseVersion;
+    
     public static string baseVersion
     {
         get
         {
+           
             _baseVersion = EditorPrefs.GetString(nameof(baseVersion), "1");
             return _baseVersion;
         }
@@ -40,27 +62,203 @@ public class EasyUseEditorFuns
     {
         get
         {
-            return System.Environment.CurrentDirectory + "/../mySvn/" + baseVersion;
+            return System.Environment.CurrentDirectory + "/mySvn/" + baseVersion;
         }
     }
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="modulePath 是一个路径 类似hot_fix/hall/chat/interface"></param>
+    /// <returns></returns>
+    public static string GetNameSpaceStringPath(string modulePath)
+    {
+        var tmpNameSpace = modulePath.Replace("/", ".");
 
+
+        if (tmpNameSpace.Contains("hot_fix"))
+        {
+            tmpNameSpace = tmpNameSpace.Replace("hot_fix", "HotFix");
+        }
+
+        var nameSpaceArray = tmpNameSpace.Split('.');
+        for (int i = 0; i < nameSpaceArray.Length; i++)
+        {
+            if (char.IsLower(nameSpaceArray[i][0]))
+            {
+                nameSpaceArray[i] = CapitalizeFirstLetter(nameSpaceArray[i]);
+            }
+
+        }
+        //首字母大写 
+        string CapitalizeFirstLetter(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            return char.ToUpper(input[0]) + input.Substring(1);
+        }
+
+
+        tmpNameSpace = string.Join(".", nameSpaceArray);
+        if (tmpNameSpace.Contains("Hotfix"))
+        {
+            tmpNameSpace = tmpNameSpace.Replace("Hotfix", "HotFix");
+        }
+        return tmpNameSpace;
+    }
+
+    public static void WriteAllText(string path, string contents)
+    {
+        var resPath = path;
+        if (path.StartsWith("Assets"))
+        {
+            resPath = Path.Combine(AssetDatabaseExpand.projectRootPath, path).ToLinuxPath();
+        }
+        else if (path.StartsWith("Packages"))
+        {
+            resPath = Path.Combine(AssetDatabaseExpand.projectRootPath, path).ToLinuxPath();
+        }
+        File.WriteAllText(resPath, contents);
+    }
+    /// <summary>
+    /// 获取目录的父级目录
+    /// </summary>
+    /// <param name="path"></param>
+    /// <returns></returns>
+    public static string ToParentPath(this string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return null;
+
+        var parent = Directory.GetParent(path);
+        return parent?.FullName;
+    }
+
+    public static string ToFullPath(this string path)
+    {
+        var resPath = path;
+        if (path.StartsWith("Assets"))
+        {
+            resPath = Path.Combine(AssetDatabaseExpand.projectRootPath, path).ToLinuxPath();
+        }
+        else if (path.StartsWith("Packages"))
+        {
+            resPath = Path.Combine(AssetDatabaseExpand.projectRootPath, path).ToLinuxPath();
+        }
+        else
+        {
+            resPath = resPath.ToLinuxPath();
+        }
+        return resPath;
+    }
+
+    public static string ReadAllText(string path)
+    {
+        var resPath = path;
+        if (path.StartsWith("Assets"))
+        {
+            resPath = Path.Combine(AssetDatabaseExpand.projectRootPath, path).ToLinuxPath();
+        }
+        else if (path.StartsWith("Packages"))
+        {
+            resPath = Path.Combine(AssetDatabaseExpand.projectRootPath, path).ToLinuxPath();
+        }
+        return File.ReadAllText(resPath);
+    }
+    /// <summary>
+    /// 获取目录内所有文件 
+    /// </summary>
+    /// <param name="folders"></param>
+    /// <param name="suffix"></param>
+    /// /// filter 过滤器 过滤某些文件等 
+    /// <returns></returns>
+    public static List<string> GetAllFiles(string[] folders,string suffix,Func<string,bool> filter = null)
+    {
+        List<string> files = new List<string>();
+        for(int i = 0; i < folders.Length; i++)
+        {
+            if (!Directory.Exists(folders[i])) continue;
+            files.AddRange( Directory.GetFiles(folders[i], suffix, SearchOption.AllDirectories) ) ;
+        }
+        files = files.ConvertAll((xx) => xx.ToLinuxPath());
+        if (filter != null)
+        {
+            files = files.Where(f => filter(f)).ToList();
+        }
+        return files;
+        
+    }
+    static List<string> csFilterFolder = new List<string>()
+    {
+        "Resources","RTLTMPro","StreamingAssets","TextMesh Pro","Reporter","Plugins","Firebase",
+        "FacebookSDK","AppleAuth","3rdParty"
+    };
+    static List<string> csFileFilter = new List<string>()
+    {
+        "NameSpaceFix.cs","CodeMoveTool.cs","FixNameSpaceError.cs","FolderRenameWindow.cs"
+    };
+    public static List<string> GetAllUserLayerCSCode()
+    {
+        var allCsFiles = GetAllFiles(new string[] {
+                    "Assets"
+                }, "*.cs", (file) =>
+                {
+                    bool rst = csFilterFolder.Any((ll) => Regex.IsMatch(file, $@"/Assets/{ll}/"));
+                    rst |= csFileFilter.Any((ll) => file.EndsWith(ll));
+                    return !rst;
+                });
+        return allCsFiles;
+    }
 
 
     public static string GetLinuxPath(string s)
     {
+        if(string.IsNullOrEmpty(s))
+        {
+            return s;
+        }
         return s.Replace("\\", "/");
+    }
+
+    public static string ToLinuxPath(this string s)
+    {
+        return GetLinuxPath(s);
+    }
+
+    public static string ToWindowsContent(this string s)
+    {
+        s = s.Replace("\r\n", "\n");
+        s = s.Replace("\n", "\r\n");
+        return s;
+    }
+
+    public static string ToUnityPath(this string s,bool withAsset = true)
+    {
+        return GetUnityAssetPath(s,withAsset);
     }
     /// <summary>
     /// 获取unity资源路径 
     /// </summary>
     /// <param name="fullPath全路径"></param>
     /// <returns></returns>
-    public static string GetUnityAssetPath( string fullPath)
+    public static string GetUnityAssetPath( string fullPath,bool withAsset = true)
     {
-        var index = fullPath.IndexOf("Assets/");
-        if (index >= 0)
+        fullPath = GetLinuxPath(fullPath);
+        var index = fullPath.IndexOf("Assets");
+        if (index >= 0 )
         {
-            return fullPath.Substring(index);
+            if (withAsset)
+                return fullPath.Substring(index);
+            int idx = index + "Assets/".Length;
+            if (idx > fullPath.Length - 1)
+            {
+                return "";
+            }
+            else
+            {
+                return fullPath.Substring(index + "Assets/".Length);
+            }
+            
         }
         return fullPath;
     }
@@ -72,7 +270,7 @@ public class EasyUseEditorFuns
     /// <param name="target 绝对路径"></param>
     /// <param name="withMetaFile 是否将meta文件一并move"></param>
 
-    public static void UnitySaveMoveFile(string source, string target, bool withMetaFile = true)
+    public static void UnitySaveMoveFile(string source, string target, bool withMetaFile = true,bool withPathMetaFile = false)
     {
         try
         {
@@ -82,8 +280,8 @@ public class EasyUseEditorFuns
             var targetFolder = System.IO.Path.GetDirectoryName(target);
             sourceFolder = Path.GetFullPath(sourceFolder);
             targetFolder = Path.GetFullPath(targetFolder);
-            CreateDir(sourceFolder);
-            CreateDir(targetFolder);
+            CreateDir(source);
+            CreateDir(target);
 
             var sourceName = System.IO.Path.GetFileName(source);
             var targetName = System.IO.Path.GetFileName(target);
@@ -104,7 +302,15 @@ public class EasyUseEditorFuns
                 }
                 System.IO.File.Move(metaSourceFile, metaTargeFile);
             }
-            
+
+            if (withPathMetaFile)
+            {
+                var metaFilePath2 = target + ".path";
+                var targetUnityAssetPathName = target.Substring(target.IndexOf("Assets/"));
+                // 用额外的txt文件记录该文件的路径 方便回退
+                EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath2, targetUnityAssetPathName, false);
+            }
+
         }
         catch (Exception e)
         {
@@ -132,8 +338,8 @@ public class EasyUseEditorFuns
             var targetFolder = System.IO.Path.GetDirectoryName(target);
             sourceFolder = Path.GetFullPath(sourceFolder);
             targetFolder = Path.GetFullPath(targetFolder);
-            CreateDir(sourceFolder);
-            CreateDir(targetFolder);
+            CreateDir(source);
+            CreateDir(target);
 
             var sourceName = System.IO.Path.GetFileName(source);
             var targetName = System.IO.Path.GetFileName(target);
@@ -166,12 +372,11 @@ public class EasyUseEditorFuns
     /// </summary>
     /// <param name="resPath"></param>
     /// <param name="isSaveToLocal"></param>
-    public static void DelEditorResFromDevice(string resPath, bool isSaveToLocal = true)
+    public static void DelEditorResFromDevice(string resPath)
     {
         try
         {
-            if (!isSaveToLocal)
-                Debug.Log($"{resPath}已删除且不存档");
+            
 
             AssetDatabase.DeleteAsset(resPath);
             AssetDatabase.DeleteAsset(resPath + ".meta");
@@ -205,18 +410,9 @@ public class EasyUseEditorFuns
         }
     }
 
-    public static string GetScriptSymble(out NamedBuildTarget nameBt)
+    public static string GetScriptSymble(BuildTarget target,out NamedBuildTarget nameBt)
     {
-        BuildTarget target = BuildTarget.iOS;
-#if UNITY_ANDROID
-		target = BuildTarget.Android;
 
-#elif UNITY_WEBGL
-		target = BuildTarget.WebGL;
-
-#elif UNITY_STANDALONE
-        target = BuildTarget.StandaloneWindows;
-#endif
         string symbles = "";
         NamedBuildTarget nameBuildTarget;
         if (target == BuildTarget.iOS)
@@ -239,18 +435,50 @@ public class EasyUseEditorFuns
         nameBt = nameBuildTarget;
         return symbles;
     }
+
+    public static string ToGuid(this string assetPath)
+    {
+       
+        var path = assetPath.ToUnityPath();
+        if(!path.EndsWith(".meta"))
+        {
+            path += ".meta";
+        }
+        if(!File.Exists(path.ToFullPath()))
+        {
+            Debug.LogError($"不存在目录{path}");
+        }
+        // 读取内容
+        string metaText = File.ReadAllText(path);
+
+        // 正则查找
+        string pattern = @"^guid:\s*([a-fA-F0-9]{32})\s*$";
+
+        // 用Multiline
+        Match m = Regex.Match(metaText, pattern, RegexOptions.Multiline);
+        if (m.Success)
+        {
+            string guid = m.Groups[1].Value;
+            return guid;
+        }
+        else
+        {
+            Debug.LogError("没有找到guid字段");
+            return null;
+        }
+    }
     /// <summary>
     /// 是否具有预编译宏 xx
     /// </summary>
     /// <param name="symble"></param>
     /// <returns></returns>
-    public static bool HasDebugSymble(string symble)
+    public static bool HasDebugSymble(BuildTarget target, string symble)
     {
         NamedBuildTarget nameBt;
-        var symbles = GetScriptSymble(out nameBt);
+        var symbles = GetScriptSymble(target,out nameBt);
         if (!string.IsNullOrEmpty(symbles))
         {
-            var symble_arr = symbles.Split(";");
+            var symble_arr = symbles.Split(';');
             var index = Array.IndexOf(symble_arr, symble);
             if (index >= 0)
             {
@@ -259,15 +487,15 @@ public class EasyUseEditorFuns
         }
         return false;
     }
-    public static void ChangeToXXDefine(bool isDebug, string symble)
+    public static void SetUnitySymbleDefine(BuildTarget  target, bool isAddOrRemove, string symble)
     {
         NamedBuildTarget nameBt;
-        var symbles = GetScriptSymble(out nameBt);
-        if (isDebug)
+        var symbles = GetScriptSymble(target,out nameBt);
+        if (isAddOrRemove)
         {
             if (!string.IsNullOrEmpty(symbles))
             {
-                var symble_arr = symbles.Split(";");
+                var symble_arr = symbles.Split(';');
                 if (Array.IndexOf(symble_arr, symble) < 0)
                 {
                     symbles += $";{symble}";
@@ -282,7 +510,7 @@ public class EasyUseEditorFuns
         {
             if (!string.IsNullOrEmpty(symbles))
             {
-                var symble_arr = symbles.Split(";");
+                var symble_arr = symbles.Split(';');
                 var index = Array.IndexOf(symble_arr, symble);
                 if (index >= 0)
                 {
@@ -313,11 +541,7 @@ public class EasyUseEditorFuns
     {
         contents = GetUnityAssetPath(contents);
         filePath = Path.GetFullPath(filePath);
-        var folderName = System.IO.Path.GetDirectoryName(filePath);
-        if (!Directory.Exists(folderName))
-        {
-            CreateDir(folderName);
-        }
+        CreateDir(filePath);
         File.WriteAllText(filePath, contents);
         var writeFilePath = EasyUseEditorFuns.GetLinuxPath(baseCustomTmpCache);
         filePath = filePath.Replace(baseCustomTmpCache + "/", "");
@@ -326,30 +550,221 @@ public class EasyUseEditorFuns
             EditorLogWindow.WriteLog(filePath.Replace(".path", ""));
     }
 
-    public static int CreateDir(string path)
+    
+    public static void CreateDir(string path)
     {
-
+        if (File.Exists(path))
+        {
+            return;
+        }
         if (Directory.Exists(path))
         {
-            return 1;
+            return;
         }
-        path = GetLinuxPath(path);
-        string tmp = path.Substring(0, path.LastIndexOf("/"));
-        if (1 == CreateDir(tmp))
+
+        var father = Directory.GetParent(path);
+
+        while (!father.Exists)
         {
-            if (!(path.LastIndexOf(".") > 0))
-            {
-                Directory.CreateDirectory(path);
-                return 1;
-            }
+            Directory.CreateDirectory(father.FullName);
+            father  = Directory.GetParent(father.FullName);
         }
-        return 0;
     }
     public static GameObject GetSelectObject()
     {
         return Selection.activeGameObject;
     }
+    /// <summary>
+    /// 获取选中结点的prefab root
+    /// </summary>
+    /// <returns></returns>
+    public static GameObject GetSelectGameObjectPrefab()
+    {
+        var activeGameObject = Selection.activeObject as GameObject;
+        var rootGo = activeGameObject.transform;
+        while (rootGo != null)
+        {
+            //处于编辑prefab的状态下
+            if (PrefabStageUtility.GetCurrentPrefabStage() != null)
+            {
+                if (Regex.IsMatch(rootGo.parent.name, @"(Environment)"))
+                {
+                    break;
+                }
+            }
+            else if (Application.isPlaying) // 运行时 
+            {
+                var li = Enum.GetValues(typeof(UIType)).Cast<UIType>().Select((xx) => xx.ToString()).ToList();
+                bool needBreak = false;
+                for (global::System.Int32 i = 0; i < li.Count; i++)
+                {
+                    if (Regex.IsMatch(rootGo.parent.name, li[i]))
+                    {
+                        needBreak = true;
+                        break;
+                    }
+                }
+                if (needBreak)
+                {
+                    break;
+                }
+            }
+            rootGo = rootGo.parent;
+        }
+        return rootGo?.gameObject;
+    }
+    /// <summary>
+    /// 通过选中的某个节点获取预设的路径 
+    /// </summary>
+    /// <param name="instance如果传入为空默认使用当前选中的gameObject"></param>
+    /// <returns></returns>
+    public static List<string> GetSelectPrefabPath(GameObject instance = null  )
+    {
+        if(instance == null)
+        {
+            var activeGameObject = Selection.activeObject as GameObject;
+            var rootGo = activeGameObject.transform;
+            while (rootGo != null)
+            {
+                //处于编辑prefab的状态下
+                if(PrefabStageUtility.GetCurrentPrefabStage() != null)
+                {
+                    if (Regex.IsMatch(rootGo.parent.name, @"(Environment)"))
+                    {
+                        break;
+                    }
+                } 
+                else if(Application.isPlaying) // 运行时 
+                {
+                    var li = Enum.GetValues(typeof(UIType)).Cast<UIType>().Select((xx)=>xx.ToString()).ToList();
+                    bool needBreak = false;
+                    for (global::System.Int32 i = 0; i < li.Count; i++)
+                    {
+                        if (Regex.IsMatch(rootGo.parent.name, li[i]))
+                        {
+                            needBreak = true;
+                            break;
+                        }
+                    }
+                    if(needBreak)
+                    {
+                        break;
+                    }
+                }
+                rootGo = rootGo.parent;
+            }
+            instance = rootGo.gameObject;
+        }
 
+        var name = instance.name;
+
+        if (_index == null || _index.Count == 0)
+        {
+            _index = new Dictionary<string, List<string>>();
+            string[] assetGUIDs = AssetDatabase.FindAssets("t:prefab");
+            foreach (string guid in assetGUIDs)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+
+                string filename = System.IO.Path.GetFileNameWithoutExtension(path);
+                List<string> paths = null;
+                if (!_index.TryGetValue(filename.ToLower(), out paths))
+                {
+                    paths = new List<string>();
+                    //可能会有同名的预设 ，但是路径不相同 
+                    _index[filename.ToLower()] = paths;
+                }
+                paths.Add(path); // 这里可以加一个排重 
+            }
+        }
+
+
+        List<string> candidates = new List<string>();
+
+        GameObject instanceRoot = instance;
+        while (instanceRoot != null)
+        {
+            string candidateName = WithoutClonePostfix(instanceRoot.name).ToLower();
+
+            List<string> paths;
+            if (_index.TryGetValue(candidateName, out paths))
+            {
+                foreach (var path in paths)
+                {
+                    GameObject prefabRoot = AssetDatabase.LoadAssetAtPath(path, typeof(GameObject)) as GameObject;
+                    if (!prefabRoot) continue;
+
+                    var prefabPath = GetPathForObjectInHierarchy(instance, instanceRoot);
+                    GameObject prefab = prefabRoot.GetChildByPath(prefabPath);
+
+                    if (prefab == null) { continue; }
+                    candidates.Add(path);
+                }
+            }
+
+            instanceRoot = instanceRoot.transform.parent?.gameObject;
+        }
+        if (candidates.Count > 0)
+        {
+            candidates.Sort((c1, c2) => c2.Length.CompareTo(c1.Length));
+        }
+        return candidates;
+    }
+
+    public static GameObject GetChildByPath(this GameObject gameObject, string path)
+    {
+        if (path != null && path.StartsWith("origin"))
+        {
+            path = path.Substring(path.IndexOf("origin/") + "origin/".Length);
+        }
+        if (path != null)
+        {
+            Transform t = path.Length > 0 ? gameObject.transform.Find(path) : gameObject.transform;
+            if (t != null)
+            {
+                return t.gameObject;
+            }
+        }
+        return null;
+    }
+    public static string GetPathForObjectInHierarchy(GameObject childGO, GameObject baseGO)
+    {
+        bool found = false;
+        string path = "";
+        Transform t = childGO != null ? childGO.transform : null;
+        while (t != null)
+        {
+            if (t == baseGO.transform)
+            {
+                found = true;
+                break;
+            }
+            if (string.IsNullOrEmpty(path))
+                path = t.name;
+            else
+                path = t.name + "/" + path;
+            t = t.parent;
+        }
+        return found ? path : null;
+    }
+
+    public static string WithoutClonePostfix(string name)
+    {
+        TryRemovePostfix(ref name, "(Clone)");
+        return name;
+    }
+    private static bool TryRemovePostfix(ref string str, string postfix)
+    {
+        if (!str.EndsWith(postfix))
+        {
+            return false;
+        }
+        else
+        {
+            str = str.Substring(0, str.Length - postfix.Length);
+            return true;
+        }
+    }
     public static string GetNodePath(GameObject go)
     {
         var parent = go.transform.parent;
@@ -417,6 +832,13 @@ public class EasyUseEditorFuns
     {
         return Selection.activeGameObject;
     }
+
+    public static string GetHierarchyPath(GameObject go)
+    {
+        var parent = go.transform.parent;
+        return parent == null ? go.name : GetHierarchyPath(parent.gameObject) + "/" + go.name;
+    }
+
     //获取选中对象路径 在展示面板上 
     public static string GetSelObjPathInHierarchy(GameObject go)
     {
@@ -455,16 +877,16 @@ public class EasyUseEditorFuns
     /// </summary>
     /// <param name="oldpath">源目录</param>
     /// <param name="newpath">新目录</param>
-    public static void CopyDirectory(string oldpath, string newpath)
+    public static void CopyDirectory(string oldpath, string newpath,bool withFolderName = true)
     {
         oldpath = oldpath.Replace("\\", "/");
         newpath = newpath.Replace("\\", "/");
         if (string.IsNullOrWhiteSpace(newpath)) return;
         var folderName = oldpath.Substring(oldpath.LastIndexOf("/", StringComparison.Ordinal) + 1);
-        var desfolderdir = newpath + "/" + folderName;
+        var desfolderdir = withFolderName ? newpath + "/" + folderName : newpath;
         if (newpath.LastIndexOf("/", StringComparison.Ordinal) == (newpath.Length - 1))
         {
-            desfolderdir = newpath + folderName;
+            desfolderdir = withFolderName ? newpath + folderName : newpath;
 
         }
         var filenames = Directory.GetFileSystemEntries(oldpath);
@@ -584,9 +1006,14 @@ public class EasyUseEditorFuns
         }
     }
 #endif
-    
-    public static void DelFolderAllContens(string directoryPath)
+    /// <summary>
+    /// 删除所有目录下的文件
+    /// </summary>
+    /// <param name="directoryPath"></param>
+    public static void DelFolderAllContens(string directoryPath,bool includeSelf = false,string filter = "",bool
+        isSaveArchive = false)
     {
+        directoryPath = GetLinuxPath(directoryPath);
         // 检查目录是否存在
         if (Directory.Exists(directoryPath))
         {
@@ -594,7 +1021,28 @@ public class EasyUseEditorFuns
             string[] files = Directory.GetFiles(directoryPath);
             foreach (string file in files)
             {
-                File.Delete(file);
+
+                if (string.IsNullOrEmpty(filter) || file.EndsWith(filter))
+                {
+                    if (!file.EndsWith(".meta"))
+                    {
+                        if(isSaveArchive)
+                        {
+                            UnitySaveCopyFile(file, baseCustomTmpCache + "/" + file.ToUnityPath(), true, true, true, false);
+                        }
+                        
+                    }
+
+
+                    File.Delete(file);
+                    if (File.Exists(file + ".meta"))
+                    {
+                        File.Delete(file + ".meta");
+                    }
+                }
+
+
+                
             }
 
             // 递归删除所有子目录及其内容
@@ -604,6 +1052,8 @@ public class EasyUseEditorFuns
                 DelFolderAllContens(subDirectory);
                 Directory.Delete(subDirectory);
             }
+            if (includeSelf)
+                Directory.Delete(directoryPath);
         }
     }
 
@@ -626,7 +1076,7 @@ public class EasyUseEditorFuns
             {
                 if (Regex.IsMatch(selectedObject.name, selectedObject.name) &&
                 PrefabStageUtility.GetCurrentPrefabStage() != null &&
-                selectedObject as GameObject != null && (selectedObject as GameObject).transform.parent.name.Contains("(Environment)"))
+                selectedObject as GameObject != null )
                 {
                     isInPrefabStage = true;
                     return true;
@@ -657,13 +1107,243 @@ public class EasyUseEditorFuns
             }
             
         }
-        StringBuilder sb = new();
+        StringBuilder sb = new StringBuilder();
         dependency.ForEach((xx) => sb.AppendLine(xx));
         Debug.Log("依赖：" + sb.ToString());
         if(hasReferency)
         {
             Debug.Log("引用不为空");
         }
+    }
+    /// <summary>
+    /// 获得命名空间
+    /// </summary> 
+    /// <param name="filePath 文件全路径 或者unity资源路径"></param>
+    /// <returns></returns>
+    public static  string GetNameSpaceName(string filePath)
+    {
+        filePath = GetLinuxPath(filePath);
+        string folderName = "";
+        if (filePath.Contains("/"))
+        {
+            folderName = Path.GetDirectoryName(filePath);
+        }
+        else
+        {
+            folderName = filePath;
+        }
+        
+        var item = EasyUseEditorFuns.GetUnityAssetPath(folderName, false);
+        var tmpNameSpace = item.Replace("/", ".");
+        if (tmpNameSpace.Contains("hot_fix"))
+        {
+            tmpNameSpace = tmpNameSpace.Replace("hot_fix", "HotFix");
+        }
+        var nameSpaceArray = tmpNameSpace.Split('.');
+        if(nameSpaceArray.Length > 0)
+        {
+            for (int i = 0; i < nameSpaceArray.Length; i++)
+            {
+                if (nameSpaceArray[i].Length == 0)
+                {
+                    Debug.LogError("异常" + filePath);
+                    continue;
+                }
+                if (char.IsLower(nameSpaceArray[i][0]))
+                {
+                    nameSpaceArray[i] = CapitalizeFirstLetter(nameSpaceArray[i]);
+                }
+
+            }
+        }
+        else
+        {
+            tmpNameSpace  = CapitalizeFirstLetter(tmpNameSpace);
+        }
+        
+
+        tmpNameSpace = string.Join(".", nameSpaceArray);
+
+        if (tmpNameSpace.Contains("Hotfix"))
+        {
+            tmpNameSpace = tmpNameSpace.Replace("Hotfix", "HotFix");
+        }
+
+        string CapitalizeFirstLetter(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            return char.ToUpper(input[0]) + input.Substring(1);
+        }
+
+        return tmpNameSpace;
+
+    }
+    /// <summary>
+    /// 判断一个类是否具有命名空间 
+    /// </summary>
+    /// <param name="content cs代码文本 "></param>
+    /// <returns></returns>
+    public static bool HasNamespaceDeclaration(string content)
+    {
+        return Regex.IsMatch(content, @"\bnamespace\s+\w+");
+    }
+    /// <summary>
+    /// 获取全路径 
+    /// </summary>
+    /// <param name="unityPath"></param>
+    /// <returns></returns>
+    public static  string GetFullPath(string unityPath)
+    {
+        unityPath = GetLinuxPath(unityPath);
+        if(unityPath.StartsWith("Assets/"))
+        {
+            return GetLinuxPath(Environment.CurrentDirectory + "/" + unityPath);
+        }
+        else
+        {
+            return GetLinuxPath(Environment.CurrentDirectory + "/Assets/" + unityPath);
+        }
+    }
+
+
+    /// <summary>
+    /// 获取cs文件的文件类名
+    /// </summary>
+    /// <param name="content"></param>
+    /// <returns></returns>
+    public static string ExtractClassName(string content)
+    {
+        // 匹配类、结构体或接口定义
+        Match match = Regex.Match(content, @"(class|struct|interface)\s+([^\s:{]+)");
+        return match.Success ? match.Groups[2].Value.Trim() : null;
+    }
+    /// <summary>
+    /// 找到类的定义位置 
+    /// </summary>
+    /// <param name="content"></param>
+    /// <param name="className"></param>
+    /// <returns></returns>
+    public static int FindClassDefinitionPosition(string content, string className)
+    {
+        // 查找类定义行
+        int pos = content.IndexOf($"class {className}") + $"class {className}".Length;
+        if (pos < 0) pos = content.IndexOf($"struct {className}") + $"struct {className}".Length;
+        if (pos < 0) pos = content.IndexOf($"interface {className}") + $"interface {className}".Length;
+
+        // 找到类定义行的开头
+        while (pos >= 0 && content[pos] != '\n')
+        {
+            pos--;
+        }
+
+        return pos + 1;
+    }
+
+    /// <summary>
+    /// 删除无效的文件夹 
+    /// </summary>
+    /// <param name="rootPath"></param>
+    public static void CleanEmptyDirectories(string rootPath)
+    {
+        if (!Directory.Exists(rootPath))
+        {
+            Console.WriteLine($"目录不存在: {rootPath}");
+            return;
+        }
+
+        try
+        {
+            // 1. 先递归处理所有子目录
+            foreach (string subDir in Directory.GetDirectories(rootPath))
+            {
+                CleanEmptyDirectories(subDir);
+            }
+
+            // 2. 检查当前目录是否为空
+            if (IsDirectoryEmpty(rootPath))
+            {
+                try
+                {
+                    if(File.Exists(rootPath+".meta"))
+                    {
+                        File.Delete(rootPath + ".meta");
+                    }
+                    Directory.Delete(rootPath);
+                    Console.WriteLine($"已删除空目录: {rootPath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"删除目录失败 {rootPath}: {ex.Message}");
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Console.WriteLine($"无权限访问目录: {rootPath}");
+        }
+        catch (DirectoryNotFoundException)
+        {
+            Console.WriteLine($"目录不存在: {rootPath}");
+        }
+    }
+    private static bool IsDirectoryEmpty(string path)
+    {
+        try
+        {
+            return Directory.GetFiles(path).Length == 0 &&
+                   Directory.GetDirectories(path).Length == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+
+    public static T FindComponent_DFS<T>(this Transform trans, string childName, bool log = true) where T : Component
+    {
+        var target = DFSVisit<string, Transform>(trans,
+            (t, str) => { if (t.name.Equals(str)) return t; return null; },
+            childName
+        );
+
+        if (target == null)
+        {
+            if (log)
+                Debug.LogError(string.Format("cann't find child transform {0} in {1}", childName, trans.gameObject.name));
+
+            return null;
+        }
+
+        T component = target.GetComponent<T>();
+        if (component == null)
+        {
+            if (log)
+                Debug.LogError("Component is null, type = " + typeof(T).Name);
+
+            return null;
+        }
+        return component;
+    }
+
+    public static TR DFSVisit<TP, TR>(this Transform root, System.Func<Transform, TP, TR> visitFunc, TP para, TR failReturnValue = default(TR))
+    {
+        Stack<Transform> parents = new Stack<Transform>();
+        parents.Push(root);
+        while (parents.Count > 0)
+        {
+            Transform parent = parents.Pop();
+            TR ret = visitFunc(parent, para);
+            if (ret != null && !ret.Equals(failReturnValue))
+                return ret;
+            for (int i = parent.childCount - 1; i >= 0; i--)
+            {
+                parents.Push(parent.GetChild(i));
+            }
+        }
+        return failReturnValue;
     }
 
 }
