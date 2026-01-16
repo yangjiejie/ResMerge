@@ -14,8 +14,10 @@ using System.Security.Cryptography;
 
 using UnityEditor.SceneManagement;
 using UnityEngine.U2D;
+using UnityEditor.U2D;
 
-
+using UnityEditor.Build;
+using Spine.Unity;
 
 
 
@@ -52,33 +54,10 @@ public static class EasyUseEditorTool  // 简称euetool
 
     }
 
-    //[MenuItem("GameObject/右键菜单/ui收集 _F3", priority = -3)]
-    //static void UICollect()
-    //{
-    //    if (EditorWindow.HasOpenInstances<UICollectTool>())
-    //    {
-    //        var win = EditorWindow.GetWindow<UICollectTool>();
-    //        win.Close(); // 已打开 -> 关闭
-    //    }
-    //    else
-    //    {
-    //        EditorWindow.GetWindow<UICollectTool>("ui收集"); // 未打开 -> 打开
-    //    }
-    //}
+    
 
-    //[MenuItem("GameObject/右键菜单/ui工具箱 _F4", priority = -2)]
-    //static void UIToolBox()
-    //{
-    //    if (EditorWindow.HasOpenInstances<ToolboxWindow>())
-    //    {
-    //        var win = EditorWindow.GetWindow<ToolboxWindow>();
-    //        win.Close(); // 已打开 -> 关闭
-    //    }
-    //    else
-    //    {
-    //        EditorWindow.GetWindow<ToolboxWindow>("工具箱");
-    //    }
-    //}
+
+    
 
 
     [MenuItem("GameObject/右键菜单/拷贝顶层gameObject #%d", priority = -1)]
@@ -513,7 +492,82 @@ public static class EasyUseEditorTool  // 简称euetool
         AssetDatabase.Refresh();
     }
 
+    [MenuItem("Assets/右键工具/修复spine资源引用丢失", false, 0)]
+    static private void FixSpineReferenceMiss()
+    {
+        
 
+        
+        EditorApplication.ExecuteMenuItem("Assets/Copy Path");
+
+        var buffer = EditorGUIUtility.systemCopyBuffer;
+
+
+        var full = Directory.GetParent(buffer).FullName.ToFullPath();
+
+        var map = new Dictionary<string, string>()
+        {
+            {"f1b3b4b945939a54ea0b23d3396115fb" ,"7a17f8463e4e2ec4bb426b40d71ecc8b" }, // SkeletonData.asset
+            {"a6b194f808b1af6499c93410e504af42" ,"6d2f39da8e9035a48b0ce403ef938f18" }, // SpineAtlasAsset
+
+        };
+        var allfiles = Directory.GetFiles(full,"*.*",SearchOption.TopDirectoryOnly).Where((xx)=>!xx.EndsWith(".meta"))
+            .Select((xx)=>xx.ToFullPath());
+
+        var allmat = allfiles.Where((xx) => xx.EndsWith(".mat"));
+
+        var allSkedata = allfiles.Where((xx) => xx.EndsWith("SkeletonData.asset")).ToList();
+
+        var allAltas = allfiles.Where((xx) => xx.EndsWith("Atlas.asset")).ToList();
+
+        foreach(var ske in allSkedata)
+        {
+            var content = File.ReadAllText(ske);
+
+            foreach (var item in map)
+            {
+                content = Regex.Replace(content, item.Key, item.Value);
+            }
+
+            File.WriteAllText(ske, content);
+        }
+
+        foreach (var altas in allAltas)
+        {
+            var content = File.ReadAllText(altas);
+
+            foreach (var item in map)
+            {
+                content = Regex.Replace(content, item.Key, item.Value);
+            }
+
+            File.WriteAllText(altas, content);
+        }
+        foreach (var mat in allmat)
+        {
+            var tmpMat = AssetDatabase.LoadAssetAtPath<Material>(mat.ToUnityPath());
+            var findShader = Shader.Find("Spine/Skeleton"); 
+            if(findShader == null)
+            {
+                Debug.LogError("Shader.find无法找到Spine/Skeleton");
+                findShader = AssetDatabase.LoadAssetAtPath<Shader>("Assets/3rdParty/Spine/Runtime/spine-unity/Shaders/Spine-Skeleton.shader");
+                if(findShader == null)
+                {
+                    Debug.LogError(" AssetDatabase.LoadAssetAtPath 加载shader失败");
+                }
+            }
+            
+            tmpMat.shader = findShader;
+        }
+        if(allSkedata.Count == 1 && allAltas.Count == 1)
+        {
+            var skData = AssetDatabase.LoadAssetAtPath<SkeletonDataAsset>(allSkedata[0].ToUnityPath());
+            var skAltas = AssetDatabase.LoadAssetAtPath<SpineAtlasAsset>(allAltas[0].ToUnityPath());
+            skData.atlasAssets = new AtlasAssetBase[1] { skAltas };
+        }
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
     
     
 
@@ -721,6 +775,125 @@ public static class EasyUseEditorTool  // 简称euetool
             Debug.Log(AssetDatabase.GetAssetPath(item) + " -- " + EasyUseEditorFuns.GetNodePath((item as Component).gameObject) );
         }
     }
+
+    [MenuItem("Assets/右键工具/设置纹理压缩格式", false, 1)]
+    public static void BatSetTextureFormat()
+    {
+        string[] selectedGuids = Selection.assetGUIDs;
+
+        // 收集所有需要处理的贴图路径
+        var allTexturePaths = selectedGuids
+            .SelectMany(guid =>
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+
+                if (AssetDatabase.IsValidFolder(assetPath))
+                {
+                    // 查找该文件夹下所有 Texture2D
+                    string[] textureGuids = AssetDatabase.FindAssets("t:Texture2D", new[] { assetPath });
+                    return textureGuids.Select(AssetDatabase.GUIDToAssetPath);
+                }
+                else
+                {
+                    var type = AssetDatabase.GetMainAssetTypeAtPath(assetPath);
+                    if (type == typeof(Texture2D))
+                    {
+                        return new[] { assetPath };
+                    }
+                }
+                return new string[0];
+            })
+            .Distinct() // 去重，防止重复处理
+            .ToList();
+
+        if (allTexturePaths.Count == 0)
+        {
+            Debug.Log("没有找到需要处理的纹理。");
+            return;
+        }
+
+        AssetDatabase.StartAssetEditing();
+        try
+        {
+            for (int i = 0; i < allTexturePaths.Count; i++)
+            {
+                string path = allTexturePaths[i];
+                EditorUtility.DisplayProgressBar("设置纹理压缩格式",
+                    $"正在处理 {i + 1}/{allTexturePaths.Count}: {path}",
+                    (float)(i + 1) / allTexturePaths.Count);
+
+                SetTextureFormat(path);
+            }
+        }
+        finally
+        {
+            AssetDatabase.StopAssetEditing();
+            AssetDatabase.Refresh();
+            EditorUtility.ClearProgressBar();
+        }
+
+        Debug.Log($"批量处理完成，共处理 {allTexturePaths.Count} 张纹理。");
+    }
+
+    private static bool SetTextureFormat(string assetPath)
+    {
+
+        assetPath = assetPath.ToUnityPath();
+        AssetImporter assetImporter = AssetImporter.GetAtPath(assetPath);
+        if (Application.isPlaying) return false;
+        if (!assetPath.EndsWith(".png") && !assetPath.EndsWith(".jpg"))
+        {
+            return false;
+        }
+
+
+        if (!assetPath.StartsWith("Assets/Art"))
+        {
+            return false;
+        }
+
+
+
+
+        bool needImport = false;
+        TextureImporter textureImporter = (TextureImporter)assetImporter;
+
+
+
+        //有一个问题就是textureImporter的纹理类型 可能做ui的话多数会是gui 但是不能排除其他的 这里不方便直接指定
+
+        if (textureImporter.isReadable)
+        {
+            Debug.LogError("警告!isReadable == true,已自动修正" + assetPath);
+            textureImporter.isReadable = false;
+            needImport = true;
+        }
+
+
+        var androidSetting = textureImporter.GetPlatformTextureSettings("android");
+        if (!androidSetting.overridden)
+        {
+            androidSetting.overridden = true;
+            needImport = true;
+        }
+
+
+
+        if (androidSetting.format != TextureImporterFormat.ASTC_8x8)
+        {
+            androidSetting.format = TextureImporterFormat.ASTC_8x8;
+            androidSetting.overridden = true;
+            needImport = true;
+        }
+        if (needImport)
+        {
+            textureImporter.SetPlatformTextureSettings(androidSetting);
+            EditorUtility.SetDirty(textureImporter); // 标记资源已修改
+            return true;
+        }
+        return false;
+    }
+
 
     [MenuItem("Assets/右键工具/获取场景中所有相机的路径", false, 1)]
     public static void GetCameraPathInScene()

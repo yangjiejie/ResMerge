@@ -68,7 +68,7 @@ public class FindRepeatRes : EditorWindow
         {
             try
             {
-                EasyUseEditorFuns.DelEditorResFromDevice(resPath);
+                EasyUseEditorFuns.DelEditorResFromDevice(resPath, true);
             }
             catch (System.Exception e)
             {
@@ -127,9 +127,6 @@ public class FindRepeatRes : EditorWindow
             if (needDelResList == null) needDelResList = new List<SubResInfo>();
             needDelResList.Add(info);
         }
-        /// <summary>
-        /// 将需要保留的资源尝试迁移到common文件夹中，如果没有有才迁移否则不迁移
-        /// </summary>
         public void TryMoveToCommon()
         {
             if (replaceRes == null) return;
@@ -145,13 +142,11 @@ public class FindRepeatRes : EditorWindow
             var targetPath = Path.Combine(commonPath, fileName);
 
             // 用额外的txt文件记录该文件的路径 方便回退
-            EasyUseEditorFuns.WriteFileToTargetPath(Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, EasyUseEditorFuns.GetUnityAssetPath(targetPath) + ".path"), EasyUseEditorFuns.GetUnityAssetPath(targetPath), false);
-
-            File.AppendAllText(System.Environment.CurrentDirectory + "/environment/去重.txt", $"{sourcePath.ToUnityPath()}保留的guid ={replaceRes.uuid}\n");
+            EasyUseEditorFuns.WriteFileToTargetPath(Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, EasyUseEditorFuns.GetUnityAssetPath(targetPath) + ".path"), EasyUseEditorFuns.GetUnityAssetPath(targetPath));
 
             EasyUseEditorFuns.UnitySaveCopyFile(sourcePath,
                 Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, EasyUseEditorFuns.GetUnityAssetPath(sourcePath)),
-                withPathMetaFile: true, isShowLog: false
+                withPathMetaFile: true
             );
 
             EasyUseEditorFuns.UnitySaveMoveFile(sourcePath, targetPath);
@@ -163,9 +158,9 @@ public class FindRepeatRes : EditorWindow
             TryMoveToCommon();
             var sourceBasePath = System.Environment.CurrentDirectory;
             var targetBasePath = EasyUseEditorFuns.baseCustomTmpCache;
-            //执行删除前先备份 begin 
+            //执行删除前先备份 
 
-            // 先备份主资源 类似预设 prefab  
+            // 先备份预设 
 
             foreach (var item in needDelResList)
             {
@@ -182,20 +177,17 @@ public class FindRepeatRes : EditorWindow
                 }
             }
             AssetDatabase.Refresh();
-            //备份子资源 类似sprite png 那些 
+
             foreach (var item in needDelResList)
             {
                 EasyUseEditorFuns.UnitySaveCopyFile(
                              Path.Combine(sourceBasePath, item.resPath),
                              Path.Combine(targetBasePath, item.resPath),
-                             withPathMetaFile: true, isShowLog: false);
+                             withPathMetaFile: true);
             }
-            //执行删除前先备份  end 
-            //执行删除子资源
+            //执行删除 
             foreach (var item in needDelResList)
             {
-                File.AppendAllText(System.Environment.CurrentDirectory + "/environment/去重.txt", $"{item.resPath}保留的guid ={replaceRes.uuid}\n");
-
                 item.DelFromDevice();
             }
             AssetDatabase.Refresh();
@@ -302,10 +294,13 @@ public class FindRepeatRes : EditorWindow
         GUILayout.EndHorizontal();
 
         GUILayout.BeginVertical();
+        //获取选中的目录 selectFolderPaths 赋值 
         GetSelectArtFolders();
         var tmpGuids = AssetDatabase.FindAssets("t:prefab t:Material", selectFolderPaths.ToArray());
-        var tmpSubGuids = AssetDatabase.FindAssets("t:Sprite", selectFolderPaths.ToArray());
-        GUILayout.Label("检查的目录：主资源" + tmpGuids.Length + "子资源" + tmpSubGuids.Length, GUILayout.Width(340)); // 描述文本
+        var tmpSubGuids = AssetDatabase.FindAssets("t:Sprite", selectFolderPaths.ToArray()).ToList();
+        var tmpSpineSubGuids = AssetDatabase.FindAssets("t:SkeletonDataAsset", selectFolderPaths.ToArray()).ToList();
+        tmpSubGuids.AddRange(tmpSpineSubGuids);
+        GUILayout.Label("检查的目录：主资源" + tmpGuids.Length + "子资源" + tmpSubGuids.Count, GUILayout.Width(340)); // 描述文本
 
         GUILayout.BeginVertical();
         for (int i = 0; i < checkFolders.Count; i++)
@@ -333,14 +328,10 @@ public class FindRepeatRes : EditorWindow
 
 
             allAssetPaths = AssetDatabase.FindAssets("t:prefab t:Material", new string[] { "Assets/" }).Select((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
-            //构建依赖索引 
-            foreach (string path in allAssetPaths)
-            {
-                // 加载资源
-                var dependencies = AssetDatabase.GetDependencies(path).Where((dep => dep != path)).ToList();
-                dependenciesMap[path] = dependencies;
-            }
+
             ClearUnUsedTextures(paths);
+
+
         }
         GUILayout.Space(10);
         if (GUILayout.Button("2清理重复资源", GUILayout.Height(50)))
@@ -868,23 +859,35 @@ public class FindRepeatRes : EditorWindow
 
     private static void ClearUnUsedTextures(List<string> paths)
     {
+        foreach (string path in allAssetPaths)
+        {
+
+            // 这里不要递归 我们已经拿到了所有的预设 材质等主资源
+            // image和spine都被主资源依赖 
+            var dependencies = AssetDatabase.GetDependencies(path, true);
+
+
+            foreach (var dep in dependencies)
+            {
+                if (!dependenciesMap.ContainsKey(dep))
+                {
+                    dependenciesMap.Add(dep, new HashSet<string>());
+                }
+                dependenciesMap[dep].Add(path);
+            }
+        }
         // 获取所有资源
-        List<string> unusedAssets = new List<string>();
+        List<string> unusedSpriteAssets = new List<string>();
+        List<string> unusedSpineAssets = new List<string>();
         var allTextures = AssetDatabase.FindAssets("t:Sprite", paths.ToArray()).Select
-            ((xx) => AssetDatabase.GUIDToAssetPath(xx)).ToList<string>();
+            ((xx) => AssetDatabase.GUIDToAssetPath(xx)).Where((x) => !x.Contains("/global/") && !x.Contains("/gameCommon/")).ToList<string>();
 
         int index = 0;
         foreach (string assetPath in allTextures)
         {
 
-            EditorUtility.DisplayProgressBar(string.Format("Processing{0}/{1}", index, allTextures.Count), "", 1.0f * index / allTextures.Count);
-            if (!assetPath.Contains("/image/"))
-            {
-                index++;
-                continue;
-            }
-            if (assetPath.StartsWith("Assets/Art/global") ||
-                assetPath.StartsWith("Assets/Art/gameCommon"))
+            EditorUtility.DisplayProgressBar(string.Format("Processing find UnUsed Sprite{0}/{1}", index, allTextures.Count), "", 1.0f * index / allTextures.Count);
+            if (!assetPath.ToLower().Contains("/image/"))
             {
                 index++;
                 continue;
@@ -893,55 +896,88 @@ public class FindRepeatRes : EditorWindow
             // 检查资源是否被引用
             if (!IsAssetUsed(assetPath))
             {
-                unusedAssets.Add(assetPath);
+                unusedSpriteAssets.Add(assetPath);
+            }
+            index++;
+        }
+        EditorUtility.ClearProgressBar();
+
+        var allSpineRes = AssetDatabase.FindAssets("t:SkeletonDataAsset", paths.ToArray()).Select
+            ((xx) => AssetDatabase.GUIDToAssetPath(xx)).Where((x) => !x.Contains("/global/") && !x.Contains("/gameCommon/")).ToList<string>();
+        index = 0;
+        foreach (string assetPath in allSpineRes)
+        {
+
+            EditorUtility.DisplayProgressBar(string.Format("Processing find UnUsed Spine{0}/{1}", index, allSpineRes.Count), "", 1.0f * index / allSpineRes.Count);
+            if (!assetPath.ToLower().Contains("/spine/"))
+            {
+                index++;
+                continue;
+            }
+
+            // 检查资源是否被引用
+            if (!IsAssetUsed(assetPath))
+            {
+                unusedSpineAssets.Add(assetPath);
             }
             index++;
         }
         EditorUtility.ClearProgressBar();
         index = 0;
-        // 删除未使用的资源
-        if (unusedAssets.Count > 0)
+        // 删除未使用的资源 spirte 
+        if (unusedSpriteAssets.Count > 0)
         {
-            foreach (string path in unusedAssets)
+            foreach (string path in unusedSpriteAssets)
             {
-                ++index;
-                EditorUtility.DisplayProgressBar(string.Format("Processing{0}/{1}", index, allTextures.Count), "", 1.0f * index / unusedAssets.Count);
+                //比较费时间 
                 //var ss = Path.Combine(System.Environment.CurrentDirectory, path);
                 //var tt = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, path);
-                //EasyUseEditorFuns.UnitySaveCopyFile(ss, tt, true);
+                //EasyUseEditorFuns.UnitySaveCopyFile(ss, tt, true,true,true,true);
 
-
-                //var metaFilePath = Path.Combine(EasyUseEditorFuns.baseCustomTmpCache, path + ".path");
-                //// 用额外的txt文件记录该文件的路径 方便回退
-                //EasyUseEditorFuns.WriteFileToTargetPath(metaFilePath, path,true);
+                EditorUtility.DisplayProgressBar(string.Format("delete  UnUsed sprite{0}/{1}",
+                    index, unusedSpriteAssets.Count), "", 1.0f * index / unusedSpriteAssets.Count);
                 EditorLogWindow.WriteLog(path);
                 AssetDatabase.DeleteAsset(path);
+                index++;
             }
-            EditorUtility.ClearProgressBar();
-            AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log("Deleted " + unusedAssets.Count + " unused assets.");
+            Debug.Log("Deleted " + unusedSpriteAssets.Count + " unused assets.");
         }
         else
         {
             Debug.Log("No unused assets found.");
         }
+        EditorUtility.ClearProgressBar();
+        index = 0;
+        // 删除未使用的资源 spirte 
+        if (unusedSpineAssets.Count > 0)
+        {
 
+            foreach (string path in unusedSpineAssets)
+            {
+                EditorUtility.DisplayProgressBar(string.Format("delete  UnUsed Spine{0}/{1}",
+                   index, unusedSpineAssets.Count), "", 1.0f * index / unusedSpineAssets.Count);
+                EasyUseEditorFuns.DeleteSpineAssets(path);
+                index++;
+            }
+            AssetDatabase.Refresh();
+            Debug.Log("Deleted " + unusedSpineAssets.Count + " unused assets.");
+        }
+        else
+        {
+            Debug.Log("No unused assets found.");
+        }
+        EditorUtility.ClearProgressBar();
     }
     public static List<string> allAssetPaths = new List<string>();
-    public static Dictionary<string, List<string>> dependenciesMap = new Dictionary<string, List<string>>();
-    private static bool IsAssetUsed(string assetPath)
+    public static Dictionary<string, HashSet<string>> dependenciesMap = new Dictionary<string, HashSet<string>>();
+    private static bool IsAssetUsed(string subRes)
     {
-
-        foreach (var item in dependenciesMap)
+        if (dependenciesMap.ContainsKey(subRes))
         {
-            var path = item.Key;
-            var tmpDenpendencies = item.Value;
-            if (tmpDenpendencies.Contains(assetPath))
-            {
-                return true;
-            }
+            return true;
         }
+
         return false;
     }
     public static void ClearUnUsedTexturesImp(string assetPath, List<string> allMainRes)
@@ -1127,13 +1163,6 @@ public class FindRepeatRes : EditorWindow
 
     public static void CleanRepeatRes()
     {
-        //确保存在文件的父目录 
-        var logFilePath = System.Environment.CurrentDirectory + "/environment/去重.txt";
-        EasyUseEditorFuns.CreateDir(logFilePath);
-        if (File.Exists(logFilePath))
-        {
-            File.Delete(logFilePath);
-        }
 
         allMainResList?.Clear();
         allSubInfoLists?.Clear();
@@ -1195,10 +1224,13 @@ public class FindRepeatRes : EditorWindow
                 if (!likeSpriteResDepandence.ContainsKey(subRes.resPath))
                 {
                     //如果没有匹配路径image和匹配到了global(有动态加载的部分) 直接pass
-                    if (!Regex.IsMatch(subRes.resPath, @"/image/") || Regex.IsMatch(subRes.resPath, @"/global/"))
+
+
+                    if (!subRes.resPath.ToLower().Contains("/image/") || subRes.resPath.ToLower().Contains("/global/"))
                     {
                         continue;
                     }
+
 
                     likeSpriteResDepandence.Add(subRes.resPath, new List<MainResInfo>());
                 }
@@ -1212,7 +1244,7 @@ public class FindRepeatRes : EditorWindow
 
         //由于 likeSpriteResDepandecen 的list数组中 可能某几个项都是一个功能目录 也就是
         //一个ab包 所以这里还需要再封装依次 
-        Dictionary<string, List<MainResInfo>> map = new Dictionary<string, List<MainResInfo>>();
+
         foreach (var subRes in likeSpriteResDepandence)
         {
             EditorUtility.DisplayProgressBar("阶段3子资源处理", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / likeSpriteResDepandence.Count);
@@ -1220,7 +1252,7 @@ public class FindRepeatRes : EditorWindow
             {
                 spriteBeDepandence.Add(subRes.Key, new List<MergedMainResInfo>());
             }
-            map.Clear();
+            Dictionary<string, List<MainResInfo>> map = new Dictionary<string, List<MainResInfo>>();
             foreach (var mainRes in subRes.Value)
             {
                 var folderName = Path.GetDirectoryName(mainRes.resPath);
@@ -1234,7 +1266,7 @@ public class FindRepeatRes : EditorWindow
             {
                 //对于依赖的资源如果他们来自于相同的逻辑目录，也就是相同的ab包 需要合并在一起
                 var info = new MergedMainResInfo();
-                info.editorResInfos = item.Value; // 相同父级目录的主资源 合并在一个集合里面 
+                info.editorResInfos = item.Value;
                 spriteBeDepandence[subRes.Key].Add(info);
             }
         }
@@ -1338,13 +1370,27 @@ public class FindRepeatRes : EditorWindow
         index = 0;
         EditorUtility.ClearProgressBar();
 
-
+        StringBuilder sb = new StringBuilder();
         foreach (var item in resMergeHelperList)
         {
+            sb.AppendLine(item.replaceRes.resPath);
+            for (int i = 0; i < item.needDelResList.Count; i++)
+            {
+                sb.AppendLine("\t" + item.needDelResList[i].resPath);
+            }
+
             EditorUtility.DisplayProgressBar("阶段5删除多余资源并自动替换引用", string.Format("{0}/{1}", index, likeSpriteResDepandence.Count), 1.0f * index++ / resMergeHelperList.Count);
             item.Replace();
         }
+
+#if UNITY_EDITOR_WIN
+        File.WriteAllText("D:/资源冲突.txt", sb.ToString());
+
+#endif
+
+
         EditorUtility.ClearProgressBar();
+
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh(); // 刷新unity DB
     }

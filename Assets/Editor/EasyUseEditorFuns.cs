@@ -14,7 +14,6 @@ using JetBrains.Annotations;
 using GuideReplace;
 
 
-
 public static class EasyUseEditorFuns
 {
 
@@ -266,16 +265,16 @@ public static class EasyUseEditorFuns
     /// <summary>
     /// 拷贝unity的文件从source到taget 并且也拷贝meta文件
     /// </summary>
-    /// <param name="source 绝对路径"></param>
-    /// <param name="target 绝对路径"></param>
+    /// <param name="source 绝对路径和相对路径都可以"></param>
+    /// <param name="target 绝对路径和相对路径都可以 "></param>
     /// <param name="withMetaFile 是否将meta文件一并move"></param>
 
     public static void UnitySaveMoveFile(string source, string target, bool withMetaFile = true,bool withPathMetaFile = false)
     {
         try
         {
-            source = GetLinuxPath(source);
-            target = GetLinuxPath(target);
+            source = source.ToFullPath();
+            target = target.ToFullPath();
             var sourceFolder = System.IO.Path.GetDirectoryName(source);
             var targetFolder = System.IO.Path.GetDirectoryName(target);
             sourceFolder = Path.GetFullPath(sourceFolder);
@@ -372,11 +371,12 @@ public static class EasyUseEditorFuns
     /// </summary>
     /// <param name="resPath"></param>
     /// <param name="isSaveToLocal"></param>
-    public static void DelEditorResFromDevice(string resPath)
+    public static void DelEditorResFromDevice(string resPath, bool isSaveToLocal = true)
     {
         try
         {
-            
+            if (!isSaveToLocal)
+                Debug.Log($"{resPath}已删除且不存档");
 
             AssetDatabase.DeleteAsset(resPath);
             AssetDatabase.DeleteAsset(resPath + ".meta");
@@ -541,7 +541,11 @@ public static class EasyUseEditorFuns
     {
         contents = GetUnityAssetPath(contents);
         filePath = Path.GetFullPath(filePath);
-        CreateDir(filePath);
+        var folderName = System.IO.Path.GetDirectoryName(filePath);
+        if (!Directory.Exists(folderName))
+        {
+            CreateDir(folderName);
+        }
         File.WriteAllText(filePath, contents);
         var writeFilePath = EasyUseEditorFuns.GetLinuxPath(baseCustomTmpCache);
         filePath = filePath.Replace(baseCustomTmpCache + "/", "");
@@ -549,9 +553,21 @@ public static class EasyUseEditorFuns
         if(isShowLog)
             EditorLogWindow.WriteLog(filePath.Replace(".path", ""));
     }
+    public static string ToFolderParent(this string s)
+    {
+        s = s.ToLinuxPath();
+        if (s.EndsWith("/"))
+        {
+            s = s.Remove(s.Length - 1);
+        }
+        if (s.LastIndexOf("/") > 0)
+        {
+            return s.Substring(0, s.LastIndexOf("/"));
+        }
+        return s;
+    }
 
-    
-    public static void CreateDir(string path)
+    public static void CreateDir(string path, bool createUnityDir = false)
     {
         if (File.Exists(path))
         {
@@ -566,8 +582,17 @@ public static class EasyUseEditorFuns
 
         while (!father.Exists)
         {
-            Directory.CreateDirectory(father.FullName);
-            father  = Directory.GetParent(father.FullName);
+            if (createUnityDir)
+            {
+
+                AssetDatabase.CreateFolder(father.FullName.ToFolderParent().ToUnityPath(), father.Name);
+                AssetDatabase.Refresh();
+            }
+            else
+            {
+                Directory.CreateDirectory(father.FullName);
+            }
+            father = Directory.GetParent(father.FullName);
         }
     }
     public static GameObject GetSelectObject()
@@ -1089,30 +1114,39 @@ public static class EasyUseEditorFuns
         isInPrefabStage = false;
         return false;
     }
-
-    public static  void GetSpineDependency()
+    //获取spine的依赖资源 一般spine都会丢到同一个文件夹下 
+    public static  List<string> GetSpineDependency(string resPath,bool includeSelf = false)
     {
-        var resPath = AssetDatabase.GetAssetPath(Selection.activeObject);
+        if(string.IsNullOrEmpty(resPath))
+        {
+            resPath = AssetDatabase.GetAssetPath(Selection.activeObject);
+        }
+        
 
         var folderName = System.IO.Path.GetDirectoryName(resPath);
 
-        var dependency = AssetDatabase.GetDependencies(resPath).Where((xx) => xx != resPath && !xx.EndsWith(".cs") && !xx.EndsWith(".shader") && !xx.StartsWith("Assets/3rdParty/Spine")).ToList();
-        bool hasReferency = false;
-        foreach(var item in dependency)
+        var dependency = AssetDatabase.GetDependencies(resPath).Where((xx) => xx != resPath 
+        && xx.Contains(folderName) ).ToList();
+
+        if(includeSelf)
         {
-            if(!item.Contains(folderName))
-            {
-                hasReferency = true;
-                break;
-            }
-            
+            dependency.Add(resPath);
         }
-        StringBuilder sb = new StringBuilder();
-        dependency.ForEach((xx) => sb.AppendLine(xx));
-        Debug.Log("依赖：" + sb.ToString());
-        if(hasReferency)
+        //StringBuilder sb = new StringBuilder();
+        //dependency.ForEach((xx) => sb.AppendLine(xx));
+        //Debug.Log("依赖：" + sb.ToString());
+        return dependency;
+    }
+    public static void DeleteSpineAssets(string resPath)
+    {
+        var paths = GetSpineDependency(resPath, true);
+        foreach(var item in paths)
         {
-            Debug.Log("引用不为空");
+            EditorLogWindow.WriteLog(item);
+            AssetDatabase.DeleteAsset(item);
+            // 涉及到文件拷贝比较费时间 
+            //var targetPath = Path.Combine(baseCustomTmpCache, item).ToFullPath();
+            //EasyUseEditorFuns.UnitySaveMoveFile(item, targetPath, true, true);            
         }
     }
     /// <summary>
